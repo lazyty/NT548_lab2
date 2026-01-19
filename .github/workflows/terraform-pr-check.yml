@@ -210,7 +210,7 @@ ${recommendation}
 
 1. **Review the security issues** listed above
 2. **Update your Terraform code** to address the findings
-3. **Test locally** with: \`checkov -d terraform/\`
+3. **Test locally** with: checkov -d terraform/
 4. **Push your changes** to update this PR
 5. **Re-run the validation** will happen automatically
 
