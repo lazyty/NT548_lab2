@@ -100,7 +100,7 @@ jobs:
         fi
 
     - name: Upload Checkov Results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: checkov-security-report
@@ -223,7 +223,7 @@ jobs:
         echo '```' >> $GITHUB_STEP_SUMMARY
 
     - name: Upload Terraform Artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: terraform-artifacts
