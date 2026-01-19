@@ -225,6 +225,8 @@ jobs:
         path: |
           terraform/tfplan
           terraform/terraform-outputs.json
+          terraform/terraform.tfstate
+          terraform/terraform.tfstate.backup
         retention-days: 30
 
   infrastructure-tests:
@@ -239,6 +241,12 @@ jobs:
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
+
+    - name: Download Terraform Artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: terraform-artifacts
+        path: terraform/
 
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
