@@ -26,10 +26,10 @@ function Test-Prerequisites {
     # Check AWS CLI
     try {
         $null = Get-Command aws -ErrorAction Stop
-        Write-Host "✅ AWS CLI found" -ForegroundColor $Green
+        Write-Host "AWS CLI found" -ForegroundColor $Green
     }
     catch {
-        Write-Host "❌ AWS CLI not found" -ForegroundColor $Red
+        Write-Host "AWS CLI not found" -ForegroundColor $Red
         Write-Host "Please install AWS CLI from: https://aws.amazon.com/cli/" -ForegroundColor $Red
         exit 1
     }
@@ -38,30 +38,30 @@ function Test-Prerequisites {
     try {
         $null = aws sts get-caller-identity 2>$null
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "✅ AWS credentials configured" -ForegroundColor $Green
+            Write-Host "AWS credentials configured" -ForegroundColor $Green
         } else {
             throw "AWS credentials not configured"
         }
     }
     catch {
-        Write-Host "❌ AWS credentials not configured" -ForegroundColor $Red
+        Write-Host "AWS credentials not configured" -ForegroundColor $Red
         Write-Host "Please run: aws configure" -ForegroundColor $Red
         exit 1
     }
     
     # Check template file
     if (-not (Test-Path $TemplateFile)) {
-        Write-Host "❌ CloudFormation template not found: $TemplateFile" -ForegroundColor $Red
+        Write-Host "CloudFormation template not found: $TemplateFile" -ForegroundColor $Red
         exit 1
     }
     
     # Check parameters file
     if (-not (Test-Path $ParametersFile)) {
-        Write-Host "❌ Parameters file not found: $ParametersFile" -ForegroundColor $Red
+        Write-Host "Parameters file not found: $ParametersFile" -ForegroundColor $Red
         exit 1
     }
     
-    Write-Host "✅ Prerequisites check passed" -ForegroundColor $Green
+    Write-Host "Prerequisites check passed" -ForegroundColor $Green
     Write-Host ""
 }
 
@@ -71,7 +71,7 @@ function Set-Parameters {
     
     $content = Get-Content $ParametersFile -Raw
     if ($content -match "your-key-pair-name") {
-        Write-Host "⚠️  Please update the parameters file: $ParametersFile" -ForegroundColor $Yellow
+        Write-Host "Please update the parameters file: $ParametersFile" -ForegroundColor $Yellow
         Write-Host ""
         Write-Host "Required changes:"
         Write-Host "1. Set 'KeyPairName' to your AWS key pair name"
@@ -87,7 +87,7 @@ function Set-Parameters {
         }
     }
     
-    Write-Host "✅ Parameters ready" -ForegroundColor $Green
+    Write-Host "Parameters ready" -ForegroundColor $Green
     Write-Host ""
 }
 
@@ -98,9 +98,9 @@ function Test-Template {
     aws cloudformation validate-template --template-body "file://$TemplateFile" > $null
     
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "✅ Template validation successful" -ForegroundColor $Green
+        Write-Host "Template validation successful" -ForegroundColor $Green
     } else {
-        Write-Host "❌ Template validation failed" -ForegroundColor $Red
+        Write-Host "Template validation failed" -ForegroundColor $Red
         exit 1
     }
     Write-Host ""
@@ -139,9 +139,9 @@ function Start-StackDeployment {
         aws cloudformation wait stack-update-complete --stack-name $StackName
         
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "✅ Stack update completed successfully" -ForegroundColor $Green
+            Write-Host "Stack update completed successfully" -ForegroundColor $Green
         } else {
-            Write-Host "❌ Stack update failed" -ForegroundColor $Red
+            Write-Host "Stack update failed" -ForegroundColor $Red
             exit 1
         }
     } else {
@@ -157,9 +157,9 @@ function Start-StackDeployment {
         aws cloudformation wait stack-create-complete --stack-name $StackName
         
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "✅ Stack creation completed successfully" -ForegroundColor $Green
+            Write-Host "Stack creation completed successfully" -ForegroundColor $Green
         } else {
-            Write-Host "❌ Stack creation failed" -ForegroundColor $Red
+            Write-Host "Stack creation failed" -ForegroundColor $Red
             exit 1
         }
     }

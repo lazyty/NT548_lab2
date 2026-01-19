@@ -27,7 +27,7 @@ function Get-TerraformOutputs {
     Set-Location "../tests"
     
     if ([string]::IsNullOrEmpty($script:PublicIp) -or [string]::IsNullOrEmpty($script:PrivateIp)) {
-        Write-Host "❌ Could not get EC2 IPs from Terraform outputs" -ForegroundColor $Red
+        Write-Host "Could not get EC2 IPs from Terraform outputs" -ForegroundColor $Red
         exit 1
     }
     
@@ -43,14 +43,14 @@ function Test-HTTPConnectivity {
     try {
         $response = Invoke-WebRequest -Uri "http://$($script:PublicIp)" -TimeoutSec 10 -ErrorAction Stop
         if ($response.StatusCode -eq 200 -and $response.Content -match "NT548") {
-            Write-Host "✅ HTTP connectivity successful" -ForegroundColor $Green
+            Write-Host "HTTP connectivity successful" -ForegroundColor $Green
             Write-Host "Web page content retrieved successfully"
         } else {
-            Write-Host "❌ HTTP connectivity failed - unexpected response" -ForegroundColor $Red
+            Write-Host "HTTP connectivity failed - unexpected response" -ForegroundColor $Red
         }
     }
     catch {
-        Write-Host "❌ HTTP connectivity failed" -ForegroundColor $Red
+        Write-Host "HTTP connectivity failed" -ForegroundColor $Red
         Write-Host "The web server may still be starting up"
         Write-Host "Error: $($_.Exception.Message)"
     }
@@ -64,14 +64,14 @@ function Test-SSHConnectivity {
     # Check if SSH_KEY_PATH environment variable is set
     $SshKeyPath = $env:SSH_KEY_PATH
     if ([string]::IsNullOrEmpty($SshKeyPath)) {
-        Write-Host "⚠️  SSH_KEY_PATH not set. Skipping SSH tests." -ForegroundColor $Yellow
+        Write-Host "SSH_KEY_PATH not set. Skipping SSH tests." -ForegroundColor $Yellow
         Write-Host "To test SSH, set SSH_KEY_PATH environment variable:"
         Write-Host "`$env:SSH_KEY_PATH = 'C:\path\to\your\key.pem'"
         return
     }
     
     if (-not (Test-Path $SshKeyPath)) {
-        Write-Host "❌ SSH key file not found: $SshKeyPath" -ForegroundColor $Red
+        Write-Host "SSH key file not found: $SshKeyPath" -ForegroundColor $Red
         return
     }
     
@@ -80,7 +80,7 @@ function Test-SSHConnectivity {
         $null = Get-Command ssh -ErrorAction Stop
     }
     catch {
-        Write-Host "❌ SSH client not found. Please install OpenSSH or use WSL." -ForegroundColor $Red
+        Write-Host "SSH client not found. Please install OpenSSH or use WSL." -ForegroundColor $Red
         Write-Host "You can install OpenSSH via Windows Features or use Git Bash."
         return
     }
@@ -90,24 +90,24 @@ function Test-SSHConnectivity {
     try {
         $sshResult = ssh -i $SshKeyPath -o ConnectTimeout=5 -o StrictHostKeyChecking=no ec2-user@$($script:PublicIp) "echo 'SSH to public instance successful'" 2>$null
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "✅ SSH to public instance successful" -ForegroundColor $Green
+            Write-Host "SSH to public instance successful" -ForegroundColor $Green
             
             # Test SSH from public to private instance
             Write-Host "Testing SSH from public to private instance..."
             $sshToPrivate = ssh -i $SshKeyPath -o ConnectTimeout=5 -o StrictHostKeyChecking=no ec2-user@$($script:PublicIp) "ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no ec2-user@$($script:PrivateIp) 'echo SSH to private instance successful'" 2>$null
             if ($LASTEXITCODE -eq 0) {
-                Write-Host "✅ SSH from public to private instance successful" -ForegroundColor $Green
+                Write-Host "SSH from public to private instance successful" -ForegroundColor $Green
             } else {
-                Write-Host "❌ SSH from public to private instance failed" -ForegroundColor $Red
+                Write-Host "SSH from public to private instance failed" -ForegroundColor $Red
                 Write-Host "Make sure the private key is also available on the public instance"
             }
         } else {
-            Write-Host "❌ SSH to public instance failed" -ForegroundColor $Red
+            Write-Host "SSH to public instance failed" -ForegroundColor $Red
             Write-Host "Check security group rules and key pair configuration"
         }
     }
     catch {
-        Write-Host "❌ SSH test failed: $($_.Exception.Message)" -ForegroundColor $Red
+        Write-Host "SSH test failed: $($_.Exception.Message)" -ForegroundColor $Red
     }
     Write-Host ""
 }
@@ -120,13 +120,13 @@ function Test-NetworkConnectivity {
     try {
         $pingResult = Test-Connection -ComputerName $script:PublicIp -Count 3 -Quiet -ErrorAction Stop
         if ($pingResult) {
-            Write-Host "✅ Public instance is reachable via ping" -ForegroundColor $Green
+            Write-Host "Public instance is reachable via ping" -ForegroundColor $Green
         } else {
-            Write-Host "⚠️  Public instance not reachable via ping (ICMP may be blocked)" -ForegroundColor $Yellow
+            Write-Host "Public instance not reachable via ping (ICMP may be blocked)" -ForegroundColor $Yellow
         }
     }
     catch {
-        Write-Host "⚠️  Public instance not reachable via ping (ICMP may be blocked)" -ForegroundColor $Yellow
+        Write-Host "Public instance not reachable via ping (ICMP may be blocked)" -ForegroundColor $Yellow
     }
     
     # Port connectivity tests
@@ -137,14 +137,14 @@ function Test-NetworkConnectivity {
         $tcpClient = New-Object System.Net.Sockets.TcpClient
         $tcpClient.ConnectAsync($script:PublicIp, 22).Wait(5000)
         if ($tcpClient.Connected) {
-            Write-Host "✅ SSH port (22) is open" -ForegroundColor $Green
+            Write-Host "SSH port (22) is open" -ForegroundColor $Green
             $tcpClient.Close()
         } else {
-            Write-Host "❌ SSH port (22) is not accessible" -ForegroundColor $Red
+            Write-Host "SSH port (22) is not accessible" -ForegroundColor $Red
         }
     }
     catch {
-        Write-Host "❌ SSH port (22) is not accessible" -ForegroundColor $Red
+        Write-Host "SSH port (22) is not accessible" -ForegroundColor $Red
     }
     
     # Test HTTP port (80)
@@ -152,14 +152,14 @@ function Test-NetworkConnectivity {
         $tcpClient = New-Object System.Net.Sockets.TcpClient
         $tcpClient.ConnectAsync($script:PublicIp, 80).Wait(5000)
         if ($tcpClient.Connected) {
-            Write-Host "✅ HTTP port (80) is open" -ForegroundColor $Green
+            Write-Host "HTTP port (80) is open" -ForegroundColor $Green
             $tcpClient.Close()
         } else {
-            Write-Host "❌ HTTP port (80) is not accessible" -ForegroundColor $Red
+            Write-Host "HTTP port (80) is not accessible" -ForegroundColor $Red
         }
     }
     catch {
-        Write-Host "❌ HTTP port (80) is not accessible" -ForegroundColor $Red
+        Write-Host "HTTP port (80) is not accessible" -ForegroundColor $Red
     }
     
     Write-Host ""

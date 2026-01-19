@@ -1,0 +1,92 @@
+# NT548 - Checkov Security Configuration
+# Comprehensive security scanning for Terraform infrastructure
+
+# Target directories
+directory:
+  - terraform/
+
+# Frameworks to scan
+framework:
+  - terraform
+
+# Output configuration
+output:
+  - cli
+  - json
+  - sarif
+
+# Compact output for better CI/CD integration
+compact: true
+
+# Download external modules for comprehensive scanning
+download-external-modules: true
+
+# Include all Checkov policies
+include-all-checkov-policies: true
+
+# Severity levels to report (all levels for comprehensive analysis)
+severity:
+  - CRITICAL
+  - HIGH
+  - MEDIUM
+  - LOW
+  - INFO
+
+# Skip specific checks that may not apply to lab environment
+# Use with caution - only skip checks that are genuinely not applicable
+skip-check:
+  # Skip IMDSv1 check for lab environment (can be enabled for production)
+  - CKV_AWS_79   # Ensure Instance Metadata Service Version 1 is not enabled
+  
+  # Skip EBS encryption check for lab (can be enabled for production)  
+  - CKV_AWS_8    # Ensure all data stored in the Launch configuration EBS is securely encrypted at rest
+
+# Custom check configurations
+check:
+  # AWS Security Group checks
+  - CKV_AWS_23   # Ensure every security groups rule has a description
+  - CKV_AWS_24   # Ensure no security groups allow ingress from 0.0.0.0:0 to port 22
+  - CKV_AWS_25   # Ensure no security groups allow ingress from 0.0.0.0:0 to port 3389
+  
+  # AWS VPC checks
+  - CKV_AWS_12   # Ensure the default security group of every VPC restricts all traffic
+  - CKV_AWS_130  # Ensure VPC subnets do not assign public IP by default
+  
+  # AWS EC2 checks
+  - CKV_AWS_126  # Ensure that detailed monitoring is enabled for EC2 instances
+  - CKV_AWS_135  # Ensure that EC2 is EBS optimized
+  
+  # AWS IAM checks
+  - CKV_AWS_39   # Ensure AWS IAM policy does not allow "*" resource
+  - CKV_AWS_40   # Ensure AWS IAM policy does not allow "*" action
+  
+  # AWS Encryption checks
+  - CKV_AWS_7    # Ensure rotation for customer created CMKs is enabled
+  - CKV_AWS_145  # Ensure that S3 buckets are encrypted
+
+# Baseline configuration (uncomment to use)
+# baseline: .checkov.baseline
+
+# Custom policies directory (uncomment if you have custom policies)
+# external-checks-dir: ./custom-policies
+
+# Soft fail mode - don't exit with error code (useful for reporting)
+soft-fail: false
+
+# Quiet mode - reduce output verbosity
+quiet: false
+
+# Framework-specific configurations
+terraform-plan-file: null
+
+# Performance settings
+parallel: true
+max-workers: 4
+
+# Reporting configuration
+create-config: false
+config-file-path: .checkov.yml
+
+# Integration settings
+repo-root-for-plan-enrichment: .
+enable-secret-scan-all-files: false

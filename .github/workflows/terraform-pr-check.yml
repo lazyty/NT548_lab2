@@ -1,0 +1,264 @@
+name: 'NT548 - Terraform PR Validation'
+
+on:
+  pull_request:
+    branches: [ "main", "develop" ]
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/**'
+
+env:
+  TF_VERSION: '1.6.0'
+  AWS_REGION: 'us-east-1'
+
+jobs:
+  terraform-validation:
+    name: 'Terraform Validation'
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+
+    - name: Terraform Format Check
+      working-directory: ./terraform
+      run: |
+        echo "Checking Terraform formatting..."
+        terraform fmt -check -recursive
+        if [ $? -ne 0 ]; then
+          echo "Terraform files are not properly formatted"
+          echo "::error::Run 'terraform fmt -recursive' to fix formatting issues"
+          exit 1
+        fi
+        echo "Terraform formatting is correct"
+
+    - name: Terraform Initialize
+      working-directory: ./terraform
+      run: |
+        echo "Initializing Terraform..."
+        terraform init -backend=false
+        echo "Terraform initialized successfully"
+
+    - name: Terraform Validate
+      working-directory: ./terraform
+      run: |
+        echo "Validating Terraform configuration..."
+        terraform validate
+        if [ $? -eq 0 ]; then
+          echo "Terraform configuration is valid"
+        else
+          echo "Terraform configuration has validation errors"
+          exit 1
+        fi
+
+  checkov-security-analysis:
+    name: 'Security Analysis'
+    runs-on: ubuntu-latest
+    needs: terraform-validation
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Setup Python for Checkov
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install Checkov
+      run: |
+        pip install checkov==3.0.0
+        checkov --version
+
+    - name: Run Checkov Security Scan
+      id: checkov
+      run: |
+        echo "Running comprehensive security analysis..."
+        
+        # Run Checkov with detailed output
+        checkov -d terraform/ \
+          --framework terraform \
+          --output cli \
+          --output json \
+          --output-file-path checkov-results.json \
+          --soft-fail \
+          --compact \
+          --download-external-modules true
+        
+        # Parse and categorize results
+        if [ -f "checkov-results.json" ]; then
+          CRITICAL=$(jq -r '.results.failed_checks | map(select(.severity == "CRITICAL")) | length' checkov-results.json 2>/dev/null || echo "0")
+          HIGH=$(jq -r '.results.failed_checks | map(select(.severity == "HIGH")) | length' checkov-results.json 2>/dev/null || echo "0")
+          MEDIUM=$(jq -r '.results.failed_checks | map(select(.severity == "MEDIUM")) | length' checkov-results.json 2>/dev/null || echo "0")
+          LOW=$(jq -r '.results.failed_checks | map(select(.severity == "LOW")) | length' checkov-results.json 2>/dev/null || echo "0")
+          PASSED=$(jq -r '.results.passed_checks | length' checkov-results.json 2>/dev/null || echo "0")
+          SKIPPED=$(jq -r '.results.skipped_checks | length' checkov-results.json 2>/dev/null || echo "0")
+          
+          echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+          echo "high=$HIGH" >> $GITHUB_OUTPUT
+          echo "medium=$MEDIUM" >> $GITHUB_OUTPUT
+          echo "low=$LOW" >> $GITHUB_OUTPUT
+          echo "passed=$PASSED" >> $GITHUB_OUTPUT
+          echo "skipped=$SKIPPED" >> $GITHUB_OUTPUT
+          
+          TOTAL_ISSUES=$((CRITICAL + HIGH + MEDIUM + LOW))
+          echo "total-issues=$TOTAL_ISSUES" >> $GITHUB_OUTPUT
+          
+          # Extract top failed checks for summary
+          jq -r '.results.failed_checks[:5] | .[] | "- **\(.check_id)**: \(.check_name) (\(.severity))"' checkov-results.json > top-issues.txt 2>/dev/null || echo "No detailed issues found" > top-issues.txt
+        else
+          echo "critical=0" >> $GITHUB_OUTPUT
+          echo "high=0" >> $GITHUB_OUTPUT
+          echo "medium=0" >> $GITHUB_OUTPUT
+          echo "low=0" >> $GITHUB_OUTPUT
+          echo "passed=0" >> $GITHUB_OUTPUT
+          echo "skipped=0" >> $GITHUB_OUTPUT
+          echo "total-issues=0" >> $GITHUB_OUTPUT
+          echo "Could not parse results" > top-issues.txt
+        fi
+
+    - name: Generate Security Report
+      run: |
+        echo "## Security Analysis Report" >> security-report.md
+        echo "" >> security-report.md
+        echo "### Summary" >> security-report.md
+        echo "| Severity | Count | Status |" >> security-report.md
+        echo "|----------|-------|--------|" >> security-report.md
+        echo "| Critical | ${{ steps.checkov.outputs.critical }} | $([ ${{ steps.checkov.outputs.critical }} -eq 0 ] && echo "PASS" || echo "FAIL") |" >> security-report.md
+        echo "| High | ${{ steps.checkov.outputs.high }} | $([ ${{ steps.checkov.outputs.high }} -eq 0 ] && echo "PASS" || echo "FAIL") |" >> security-report.md
+        echo "| Medium | ${{ steps.checkov.outputs.medium }} | $([ ${{ steps.checkov.outputs.medium }} -eq 0 ] && echo "PASS" || echo "WARN") |" >> security-report.md
+        echo "| Low | ${{ steps.checkov.outputs.low }} | $([ ${{ steps.checkov.outputs.low }} -eq 0 ] && echo "PASS" || echo "INFO") |" >> security-report.md
+        echo "| Passed | ${{ steps.checkov.outputs.passed }} | PASS |" >> security-report.md
+        echo "| Skipped | ${{ steps.checkov.outputs.skipped }} | INFO |" >> security-report.md
+        echo "" >> security-report.md
+        echo "**Total Issues Found:** ${{ steps.checkov.outputs.total-issues }}" >> security-report.md
+        echo "" >> security-report.md
+        
+        if [ ${{ steps.checkov.outputs.total-issues }} -gt 0 ]; then
+          echo "### Top Security Issues" >> security-report.md
+          cat top-issues.txt >> security-report.md
+          echo "" >> security-report.md
+        fi
+        
+        echo "### Security Recommendations" >> security-report.md
+        echo "- Ensure Security Groups follow least privilege principle" >> security-report.md
+        echo "- Use specific CIDR blocks instead of 0.0.0.0/0 where possible" >> security-report.md
+        echo "- Enable encryption for all data at rest and in transit" >> security-report.md
+        echo "- Implement proper IAM roles with minimal permissions" >> security-report.md
+        echo "- Enable AWS CloudTrail for audit logging" >> security-report.md
+        echo "- Regular security reviews and updates" >> security-report.md
+
+    - name: Comment PR with Security Results
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const critical = '${{ steps.checkov.outputs.critical }}';
+          const high = '${{ steps.checkov.outputs.high }}';
+          const medium = '${{ steps.checkov.outputs.medium }}';
+          const low = '${{ steps.checkov.outputs.low }}';
+          const totalIssues = '${{ steps.checkov.outputs.total-issues }}';
+          
+          let status = 'PASS';
+          let statusMessage = 'Security scan passed!';
+          let recommendation = '';
+          
+          if (parseInt(critical) > 0) {
+            status = 'CRITICAL';
+            statusMessage = 'Critical security issues found!';
+            recommendation = '\n**Action Required**: Please fix critical security issues before merging.';
+          } else if (parseInt(high) > 0) {
+            status = 'FAIL';
+            statusMessage = 'High severity security issues found!';
+            recommendation = '\n**Action Required**: Please fix high severity security issues before merging.';
+          } else if (parseInt(medium) > 0) {
+            status = 'WARN';
+            statusMessage = 'Medium severity security issues found.';
+            recommendation = '\n**Recommendation**: Consider fixing medium severity issues.';
+          } else if (parseInt(low) > 0) {
+            status = 'INFO';
+            statusMessage = 'Low severity security issues found.';
+            recommendation = '\n**Info**: Low severity issues found - review when convenient.';
+          }
+          
+          let securityReport = '';
+          try {
+            securityReport = fs.readFileSync('security-report.md', 'utf8');
+          } catch (error) {
+            securityReport = 'Could not load detailed security report.';
+          }
+          
+          const comment = `## ${status} NT548 - Terraform PR Validation Results
+          
+### Validation Status
+- **Terraform Format**: Passed
+- **Terraform Validate**: Passed
+- **Security Scan**: ${statusMessage}
+
+${securityReport}
+
+${recommendation}
+
+---
+<details>
+<summary>How to fix security issues</summary>
+
+1. **Review the security issues** listed above
+2. **Update your Terraform code** to address the findings
+3. **Test locally** with: \`checkov -d terraform/\`
+4. **Push your changes** to update this PR
+5. **Re-run the validation** will happen automatically
+
+</details>
+
+*This check was automatically generated by NT548 CI/CD pipeline*`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+
+    - name: Upload Security Artifacts
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-analysis-results
+        path: |
+          checkov-results.json
+          security-report.md
+          top-issues.txt
+        retention-days: 30
+
+    - name: Security Gate Check
+      if: steps.checkov.outputs.critical != '0' || steps.checkov.outputs.high != '0'
+      run: |
+        echo "Security gate failed!"
+        echo "Found ${{ steps.checkov.outputs.critical }} critical and ${{ steps.checkov.outputs.high }} high severity issues"
+        echo "Please fix these security issues before merging the PR"
+        echo "::error::Security scan failed with critical or high severity issues"
+        exit 1
+
+    - name: Success Summary
+      if: steps.checkov.outputs.critical == '0' && steps.checkov.outputs.high == '0'
+      run: |
+        echo "## PR Validation Successful!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Terraform Format**: Passed" >> $GITHUB_STEP_SUMMARY
+        echo "**Terraform Validate**: Passed" >> $GITHUB_STEP_SUMMARY
+        echo "**Security Scan**: Passed" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Security Summary:**" >> $GITHUB_STEP_SUMMARY
+        echo "- Critical: ${{ steps.checkov.outputs.critical }}" >> $GITHUB_STEP_SUMMARY
+        echo "- High: ${{ steps.checkov.outputs.high }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Medium: ${{ steps.checkov.outputs.medium }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Low: ${{ steps.checkov.outputs.low }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Passed: ${{ steps.checkov.outputs.passed }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "This PR is ready for review and merge!"

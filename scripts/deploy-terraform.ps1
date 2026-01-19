@@ -21,10 +21,10 @@ function Test-Prerequisites {
     # Check Terraform
     try {
         $null = Get-Command terraform -ErrorAction Stop
-        Write-Host "✅ Terraform found" -ForegroundColor $Green
+        Write-Host "Terraform found" -ForegroundColor $Green
     }
     catch {
-        Write-Host "❌ Terraform not found" -ForegroundColor $Red
+        Write-Host "Terraform not found" -ForegroundColor $Red
         Write-Host "Please install Terraform from: https://www.terraform.io/downloads.html" -ForegroundColor $Red
         exit 1
     }
@@ -32,10 +32,10 @@ function Test-Prerequisites {
     # Check AWS CLI
     try {
         $null = Get-Command aws -ErrorAction Stop
-        Write-Host "✅ AWS CLI found" -ForegroundColor $Green
+        Write-Host "AWS CLI found" -ForegroundColor $Green
     }
     catch {
-        Write-Host "❌ AWS CLI not found" -ForegroundColor $Red
+        Write-Host "AWS CLI not found" -ForegroundColor $Red
         Write-Host "Please install AWS CLI from: https://aws.amazon.com/cli/" -ForegroundColor $Red
         exit 1
     }
@@ -44,17 +44,18 @@ function Test-Prerequisites {
     try {
         $null = aws sts get-caller-identity 2>$null
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "✅ AWS credentials configured" -ForegroundColor $Green
+            Write-Host "AWS credentials configured" -ForegroundColor $Green
         } else {
             throw "AWS credentials not configured"
         }
     }
     catch {
-        Write-Host "❌ AWS credentials not configured" -ForegroundColor $Red
+        Write-Host "AWS credentials not configured" -ForegroundColor $Red
         Write-Host "Please run: aws configure" -ForegroundColor $Red
         exit 1
     }
     
+    Write-Host "Prerequisites check passed" -ForegroundColor $Green
     Write-Host ""
 }
 
@@ -67,8 +68,8 @@ function Set-TerraformVariables {
     if (-not (Test-Path "terraform.tfvars")) {
         if (Test-Path "terraform.tfvars.example") {
             Copy-Item "terraform.tfvars.example" "terraform.tfvars"
-            Write-Host "⚠️  Created terraform.tfvars from example" -ForegroundColor $Yellow
-            Write-Host "⚠️  Please edit terraform.tfvars with your values" -ForegroundColor $Yellow
+            Write-Host "Created terraform.tfvars from example" -ForegroundColor $Yellow
+            Write-Host "Please edit terraform.tfvars with your values" -ForegroundColor $Yellow
             Write-Host ""
             Write-Host "Required changes:"
             Write-Host "1. Set 'allowed_ssh_ip' to your IP address"
@@ -83,12 +84,12 @@ function Set-TerraformVariables {
                 Read-Host "Press Enter after editing terraform.tfvars to continue"
             }
         } else {
-            Write-Host "❌ terraform.tfvars.example not found" -ForegroundColor $Red
+            Write-Host "terraform.tfvars.example not found" -ForegroundColor $Red
             exit 1
         }
     }
     
-    Write-Host "✅ Terraform variables ready" -ForegroundColor $Green
+    Write-Host "Terraform variables ready" -ForegroundColor $Green
     Write-Host ""
 }
 
@@ -99,9 +100,9 @@ function Initialize-Terraform {
     terraform init
     
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "✅ Terraform initialized successfully" -ForegroundColor $Green
+        Write-Host "Terraform initialized successfully" -ForegroundColor $Green
     } else {
-        Write-Host "❌ Terraform initialization failed" -ForegroundColor $Red
+        Write-Host "Terraform initialization failed" -ForegroundColor $Red
         exit 1
     }
     Write-Host ""
@@ -114,9 +115,9 @@ function Start-TerraformPlan {
     terraform plan -out=tfplan
     
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "✅ Terraform plan completed" -ForegroundColor $Green
+        Write-Host "Terraform plan completed" -ForegroundColor $Green
     } else {
-        Write-Host "❌ Terraform plan failed" -ForegroundColor $Red
+        Write-Host "Terraform plan failed" -ForegroundColor $Red
         exit 1
     }
     Write-Host ""
@@ -138,12 +139,12 @@ function Start-TerraformApply {
     terraform apply tfplan
     
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "✅ Terraform deployment completed successfully" -ForegroundColor $Green
+        Write-Host "Terraform deployment completed successfully" -ForegroundColor $Green
         Write-Host ""
         Write-Host "=== Deployment Outputs ===" -ForegroundColor $Blue
         terraform output
     } else {
-        Write-Host "❌ Terraform deployment failed" -ForegroundColor $Red
+        Write-Host "Terraform deployment failed" -ForegroundColor $Red
         exit 1
     }
 }
