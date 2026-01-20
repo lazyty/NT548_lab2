@@ -226,9 +226,6 @@ jobs:
           terraform/terraform.tfstate
           terraform/terraform.tfstate.backup
         retention-days: 30
-          terraform/terraform.tfstate
-          terraform/terraform.tfstate.backup
-        retention-days: 30
 
   infrastructure-tests:
     name: 'Infrastructure Testing'
@@ -338,53 +335,6 @@ jobs:
           echo "Elastic IPs: $EIP_COUNT"
           exit 1
         fi
-    steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
-
-    - name: Download Terraform Artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: terraform-artifacts
-        path: terraform/
-
-    - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
-
-    - name: Setup Terraform for Tests
-      uses: hashicorp/setup-terraform@v3
-      with:
-        terraform_version: ${{ env.TF_VERSION }}
-        terraform_wrapper: false
-
-    - name: Initialize Terraform for Testing
-      working-directory: ./terraform
-      run: terraform init -input=false
-
-    - name: Install PowerShell
-      run: |
-        wget -q https://github.com/PowerShell/PowerShell/releases/download/v7.3.8/powershell_7.3.8-1.deb_amd64.deb
-        sudo dpkg -i powershell_7.3.8-1.deb_amd64.deb
-        sudo apt-get install -f
-
-    - name: Run Infrastructure Tests
-      working-directory: ./tests
-      run: |
-        echo "Running infrastructure validation tests..."
-        pwsh -File run-tests.ps1
-        echo "All infrastructure tests passed"
-
-    - name: Run Connectivity Tests
-      working-directory: ./tests
-      run: |
-        echo "Running connectivity tests..."
-        pwsh -File test-connectivity.ps1
-        echo "Connectivity tests completed"
-        echo "Connectivity tests completed"
 
   deployment-notification:
     name: 'Deployment Notification'
