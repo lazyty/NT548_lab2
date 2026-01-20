@@ -103,12 +103,13 @@ function Test-InternetGateway {
         return $false
     }
     
-    $igwState = aws ec2 describe-internet-gateways --internet-gateway-ids $IgwId --query 'InternetGateways[0].State' --output text 2>$null
-    if ($LASTEXITCODE -eq 0 -and $igwState -eq "available") {
-        Write-Host "Internet Gateway is available" -ForegroundColor $Green
+    # Internet Gateway doesn't have a "State" field, just check if it exists
+    $igwExists = aws ec2 describe-internet-gateways --internet-gateway-ids $IgwId --query 'InternetGateways[0].InternetGatewayId' --output text 2>$null
+    if ($LASTEXITCODE -eq 0 -and $igwExists -eq $IgwId) {
+        Write-Host "Internet Gateway exists and is attached" -ForegroundColor $Green
         return $true
     } else {
-        Write-Host "Internet Gateway not available" -ForegroundColor $Red
+        Write-Host "Internet Gateway not found" -ForegroundColor $Red
         return $false
     }
 }

@@ -6,10 +6,6 @@ on:
     paths:
       - 'terraform/**'
       - '.github/workflows/**'
-  pull_request:
-    branches: [ "main" ]
-    paths:
-      - 'terraform/**'
   workflow_dispatch:
     inputs:
       action:
@@ -230,6 +226,9 @@ jobs:
           terraform/terraform.tfstate
           terraform/terraform.tfstate.backup
         retention-days: 30
+          terraform/terraform.tfstate
+          terraform/terraform.tfstate.backup
+        retention-days: 30
 
   infrastructure-tests:
     name: 'Infrastructure Testing'
@@ -237,8 +236,7 @@ jobs:
     needs: terraform-plan-apply
     if: |
       (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply') ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy')
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
     
     steps:
     - name: Checkout Repository
@@ -287,10 +285,111 @@ jobs:
         pwsh -File test-connectivity.ps1
         echo "Connectivity tests completed"
 
+  verify-destroy:
+    name: 'Verify Infrastructure Destroyed'
+    runs-on: ubuntu-latest
+    needs: terraform-plan-apply
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
+    
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Verify No NT548 Resources Exist
+      run: |
+        echo "Verifying all NT548 infrastructure has been destroyed..."
+        
+        # Check for VPCs
+        VPC_COUNT=$(aws ec2 describe-vpcs --filters "Name=tag:Project,Values=NT548*" --query 'length(Vpcs)' --output text)
+        echo "VPCs found: $VPC_COUNT"
+        
+        # Check for EC2 instances
+        EC2_COUNT=$(aws ec2 describe-instances --filters "Name=tag:Project,Values=NT548*" "Name=instance-state-name,Values=running,stopped,stopping,pending" --query 'length(Reservations[].Instances[])' --output text)
+        echo "EC2 instances found: $EC2_COUNT"
+        
+        # Check for NAT Gateways
+        NAT_COUNT=$(aws ec2 describe-nat-gateways --filter "Name=tag:Project,Values=NT548*" "Name=state,Values=available,pending" --query 'length(NatGateways)' --output text)
+        echo "NAT Gateways found: $NAT_COUNT"
+        
+        # Check for Elastic IPs
+        EIP_COUNT=$(aws ec2 describe-addresses --filters "Name=tag:Project,Values=NT548*" --query 'length(Addresses)' --output text)
+        echo "Elastic IPs found: $EIP_COUNT"
+        
+        # Summary
+        TOTAL=$((VPC_COUNT + EC2_COUNT + NAT_COUNT + EIP_COUNT))
+        
+        echo ""
+        echo "=== Destroy Verification Summary ==="
+        if [ "$TOTAL" -eq 0 ]; then
+          echo "SUCCESS: All NT548 infrastructure has been destroyed"
+          echo "No resources found in AWS"
+        else
+          echo "FAILED: $TOTAL resources still exist"
+          echo "VPCs: $VPC_COUNT"
+          echo "EC2: $EC2_COUNT"
+          echo "NAT Gateways: $NAT_COUNT"
+          echo "Elastic IPs: $EIP_COUNT"
+          exit 1
+        fi
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Download Terraform Artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: terraform-artifacts
+        path: terraform/
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Setup Terraform for Tests
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+        terraform_wrapper: false
+
+    - name: Initialize Terraform for Testing
+      working-directory: ./terraform
+      run: terraform init -input=false
+
+    - name: Install PowerShell
+      run: |
+        wget -q https://github.com/PowerShell/PowerShell/releases/download/v7.3.8/powershell_7.3.8-1.deb_amd64.deb
+        sudo dpkg -i powershell_7.3.8-1.deb_amd64.deb
+        sudo apt-get install -f
+
+    - name: Run Infrastructure Tests
+      working-directory: ./tests
+      run: |
+        echo "Running infrastructure validation tests..."
+        pwsh -File run-tests.ps1
+        echo "All infrastructure tests passed"
+
+    - name: Run Connectivity Tests
+      working-directory: ./tests
+      run: |
+        echo "Running connectivity tests..."
+        pwsh -File test-connectivity.ps1
+        echo "Connectivity tests completed"
+        echo "Connectivity tests completed"
+
   deployment-notification:
     name: 'Deployment Notification'
     runs-on: ubuntu-latest
-    needs: [checkov-security-scan, terraform-plan-apply, infrastructure-tests]
+    needs: [checkov-security-scan, terraform-plan-apply, infrastructure-tests, verify-destroy]
     if: always()
     
     steps:
@@ -308,17 +407,31 @@ jobs:
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "Your AWS infrastructure is ready!" >> $GITHUB_STEP_SUMMARY
 
+    - name: Destroy Success Notification
+      if: |
+        needs.terraform-plan-apply.result == 'success' &&
+        needs.verify-destroy.result == 'success'
+      run: |
+        echo "## NT548 Infrastructure Destroyed!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Terraform Destroy**: Success" >> $GITHUB_STEP_SUMMARY
+        echo "**Verification**: All resources removed" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "AWS infrastructure has been completely destroyed!" >> $GITHUB_STEP_SUMMARY
+
     - name: Deployment Failure Notification
       if: |
         needs.checkov-security-scan.result == 'failure' ||
         needs.terraform-plan-apply.result == 'failure' ||
-        needs.infrastructure-tests.result == 'failure'
+        needs.infrastructure-tests.result == 'failure' ||
+        needs.verify-destroy.result == 'failure'
       run: |
-        echo "## NT548 Deployment Failed!" >> $GITHUB_STEP_SUMMARY
+        echo "## NT548 Workflow Failed!" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Security Scan**: ${{ needs.checkov-security-scan.result }}" >> $GITHUB_STEP_SUMMARY
         echo "**Infrastructure**: ${{ needs.terraform-plan-apply.result }}" >> $GITHUB_STEP_SUMMARY
         echo "**Tests**: ${{ needs.infrastructure-tests.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Destroy Verification**: ${{ needs.verify-destroy.result }}" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "Please check the logs and fix the issues." >> $GITHUB_STEP_SUMMARY
         exit 1
