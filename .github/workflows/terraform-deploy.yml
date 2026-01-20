@@ -193,14 +193,19 @@ jobs:
         terraform apply -auto-approve tfplan
         echo "Infrastructure deployed successfully"
 
+    - name: Install PowerShell for Destroy
+      if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
+      run: |
+        wget -q https://github.com/PowerShell/PowerShell/releases/download/v7.3.8/powershell_7.3.8-1.deb_amd64.deb
+        sudo dpkg -i powershell_7.3.8-1.deb_amd64.deb
+        sudo apt-get install -f
+
     - name: Terraform Destroy
       if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
-      env:
-        TF_VAR_allowed_ssh_ip: ${{ secrets.TF_VAR_allowed_ssh_ip }}
-        TF_VAR_key_pair_name: ${{ secrets.TF_VAR_key_pair_name }}
+      working-directory: .
       run: |
-        echo "Destroying Terraform infrastructure..."
-        terraform destroy -auto-approve
+        echo "Destroying infrastructure using PowerShell script..."
+        pwsh -File scripts/destroy-infrastructure.ps1 -Force
         echo "Infrastructure destroyed successfully"
 
     - name: Save Terraform Outputs
