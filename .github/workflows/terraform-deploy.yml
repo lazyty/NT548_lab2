@@ -278,6 +278,23 @@ jobs:
         echo "Destroying Terraform infrastructure..."
         terraform destroy -auto-approve
         echo "Infrastructure destroyed successfully"
+    
+    - name: Remove DynamoDB Lock Entry
+      if: github.event_name == 'workflow_dispatch' && (github.event.inputs.action == 'destroy' || github.event.inputs.action == 'destroy-all')
+      working-directory: .
+      run: |
+        echo "Removing DynamoDB lock entry..."
+        
+        # Get AWS Account ID
+        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+        BUCKET_NAME="nt548-tfstate-${ACCOUNT_ID}"
+        LOCK_ID="${BUCKET_NAME}/terraform.tfstate"
+        
+        # Try to delete lock entry (may not exist)
+        aws dynamodb delete-item \
+          --table-name nt548-terraform-locks \
+          --key "{\"LockID\":{\"S\":\"${LOCK_ID}\"}}" \
+          --region ${{ env.AWS_REGION }} || echo "No lock entry to remove"
 
     - name: Cleanup Terraform Backend
       if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy-all'
