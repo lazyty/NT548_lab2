@@ -102,9 +102,10 @@ Project này triển khai một hạ tầng AWS hoàn chỉnh bao gồm:
 - Private Security Group (chỉ nhận traffic từ Public SG)
 
 **Backend:**
-- S3 Bucket: `nt548-tfstate-<account-id>` (encrypted, versioned)
+- S3 Bucket: `nt548-tfstate-409964509537` (encrypted, versioned)
 - DynamoDB Table: `nt548-terraform-locks` (state locking)
 - Lifecycle: Old versions deleted after 7 days
+- Note: Bucket name includes AWS Account ID for global uniqueness
 
 **CI/CD Pipeline:**
 - CodeCommit Repository: Source control
@@ -264,17 +265,19 @@ Script sẽ tự động:
 
 #### Bước 1: Setup S3 Backend
 
-```powershell
-# Chạy script setup backend (chỉ cần 1 lần)
-pwsh scripts/setup-terraform-backend.ps1
+S3 backend đã được cấu hình sẵn trong `terraform/main.tf` với bucket name: `nt548-tfstate-409964509537`
 
-# Hoặc với custom parameters
-pwsh scripts/setup-terraform-backend.ps1 -BucketName "my-terraform-state" -Region "us-east-1"
+Tạo backend resources (chỉ cần 1 lần):
+
+```powershell
+# Chạy script setup backend
+pwsh scripts/setup-terraform-backend.ps1
 ```
 
 Script sẽ tạo:
-- S3 bucket với encryption và versioning
-- DynamoDB table cho state locking
+- S3 bucket: `nt548-tfstate-409964509537` với encryption và versioning
+- DynamoDB table: `nt548-terraform-locks` cho state locking
+- Lifecycle rule: Xóa old versions sau 7 ngày
 - Block public access cho S3 bucket
 
 #### Bước 2: Cấu hình Terraform Variables
@@ -764,39 +767,43 @@ aws codecommit delete-repository --repository-name nt548-infrastructure
 
 ## Cleanup
 
-### Xóa Infrastructure (giữ Backend)
+### Xóa Infrastructure (giữ Backend) - Khuyến nghị
+
+Xóa chỉ infrastructure, giữ lại S3 backend và DynamoDB để deploy nhanh hơn lần sau:
 
 ```powershell
-cd terraform
-terraform destroy
-
-# Xác nhận: yes
+.\scripts\cleanup-all.ps1 -Force
 ```
 
 ### Xóa Tất Cả (bao gồm Backend)
 
-**Option 1: Script**
+Xóa toàn bộ bao gồm cả S3 bucket và DynamoDB table:
+
 ```powershell
-pwsh scripts/destroy-infrastructure.ps1 -Force
+.\scripts\cleanup-all.ps1 -Force -DeleteBackend
 ```
 
-**Option 2: Manual**
+### Xóa qua GitHub Actions
+
+Vào GitHub Actions → Run workflow → chọn action:
+- **destroy**: Xóa infrastructure, giữ backend
+- **destroy-all**: Xóa infrastructure + S3 bucket
+- **destroy-everything**: Xóa tất cả bao gồm DynamoDB
+
+### Xóa thủ công (nếu cần)
+
 ```powershell
 # 1. Destroy infrastructure
 cd terraform
 terraform destroy
 
-# 2. Delete S3 bucket
-ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-aws s3 rm s3://nt548-tfstate-${ACCOUNT_ID} --recursive
-aws s3api delete-bucket --bucket nt548-tfstate-${ACCOUNT_ID} --region us-east-1
+# 2. Delete S3 bucket (nếu muốn)
+aws s3 rm s3://nt548-tfstate-409964509537 --recursive
+aws s3api delete-bucket --bucket nt548-tfstate-409964509537 --region us-east-1
 
-# 3. Delete DynamoDB table
+# 3. Delete DynamoDB table (nếu muốn)
 aws dynamodb delete-table --table-name nt548-terraform-locks --region us-east-1
 ```
-
-**Option 3: GitHub Actions**
-- Chọn action `destroy-all` trong workflow
 
 ### Xóa CloudFormation Stack
 
@@ -861,6 +868,11 @@ terraform force-unlock <LOCK_ID>
 ```powershell
 # Tạo lại backend
 pwsh scripts/setup-terraform-backend.ps1
+
+# Hoặc tạo thủ công
+aws s3api create-bucket --bucket nt548-tfstate-409964509537 --region us-east-1
+aws s3api put-bucket-versioning --bucket nt548-tfstate-409964509537 --versioning-configuration Status=Enabled
+aws dynamodb create-table --table-name nt548-terraform-locks --attribute-definitions AttributeName=LockID,AttributeType=S --key-schema AttributeName=LockID,KeyType=HASH --billing-mode PAY_PER_REQUEST --region us-east-1
 ```
 
 ### SSH Connection Refused
