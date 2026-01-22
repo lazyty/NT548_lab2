@@ -3,18 +3,23 @@
 .terraform.lock.hcl
 *.tfstate
 *.tfstate.*
+*.tfstate.backup
 *.tfplan
+tfplan
 crash.log
 crash.*.log
 override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+.terraformrc
+terraform.rc
 
 # Environment variables
 .env
 .env.local
 *.tfvars
+*.tfvars.json
 !terraform.tfvars.example
 
 # IDE
@@ -23,10 +28,10 @@ override.tf.json
 *.swp
 *.swo
 *~
-.DS_Store
-Thumbs.db
 
 # OS
+.DS_Store
+Thumbs.db
 *.exe
 *.dll
 *.so
@@ -38,3 +43,14 @@ Thumbs.db
 # Build outputs
 dist/
 build/
+
+# Taskcat outputs
+taskcat_outputs/
+.taskcat/
+
+# cfn-lint reports
+cfn-lint-report.json
+build-summary.txt
+
+# CodeBuild artifacts
+.aws-sam/

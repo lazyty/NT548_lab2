@@ -250,6 +250,22 @@ Resources:
         - Key: Project
           Value: NT548-BaiTapThucHanh-01
 
+  # Default Security Group for VPC
+  DefaultSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Default security group for VPC (restricted)
+      VpcId: !Ref VPC
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: '0.0.0.0/0'
+          Description: All outbound traffic
+      Tags:
+        - Key: Name
+          Value: NT548-Default-SG-CF
+        - Key: Project
+          Value: NT548-BaiTapThucHanh-01
+
   # Public EC2 Instance
   PublicEC2Instance:
     Type: AWS::EC2::Instance
@@ -353,3 +369,7 @@ Outputs:
   PrivateSecurityGroupId:
     Description: ID of the private security group
     Value: !Ref PrivateEC2SecurityGroup
+
+  DefaultSecurityGroupId:
+    Description: ID of the default security group
+    Value: !Ref DefaultSecurityGroup

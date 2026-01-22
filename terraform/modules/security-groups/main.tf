@@ -110,3 +110,25 @@ resource "aws_security_group" "private_ec2" {
     create_before_destroy = true
   }
 }
+
+# Default Security Group for VPC
+# This restricts the default SG to prevent accidental use
+resource "aws_default_security_group" "default" {
+  vpc_id = var.vpc_id
+
+  # Deny all inbound traffic by default
+  # (no ingress rules = no inbound traffic)
+
+  # Allow all outbound traffic
+  egress {
+    description = "All outbound traffic"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge(var.tags, {
+    Name = "NT548-Default-SG"
+  })
+}

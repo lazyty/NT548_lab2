@@ -325,8 +325,24 @@ function Main {
     }
     
     # Check if Terraform state exists
-    if (-not (Test-Path "../terraform/terraform.tfstate")) {
-        Write-Host "Terraform state file not found. Please run 'terraform apply' first." -ForegroundColor $Red
+    Write-Host "Checking Terraform state..." -ForegroundColor $Yellow
+    
+    # Try to get state from S3 backend first
+    Set-Location "../terraform"
+    $stateExists = $false
+    try {
+        $null = terraform output vpc_id 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            $stateExists = $true
+        }
+    }
+    catch {
+        # Ignore error
+    }
+    Set-Location "../tests"
+    
+    if (-not $stateExists) {
+        Write-Host "Terraform state not found. Please run 'terraform apply' first." -ForegroundColor $Red
         exit 1
     }
     

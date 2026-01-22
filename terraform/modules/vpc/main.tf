@@ -48,7 +48,7 @@ resource "aws_subnet" "private" {
 # Create Elastic IP for NAT Gateway
 resource "aws_eip" "nat" {
   domain = "vpc"
-
+  
   depends_on = [aws_internet_gateway.main]
 
   tags = merge(var.tags, {

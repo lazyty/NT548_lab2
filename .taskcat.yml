@@ -1,0 +1,21 @@
+project:
+  name: NT548-CloudFormation
+  owner: NT548-Team
+  regions:
+    - us-east-1
+  parameters:
+    KeyPairName: nt548-keypair
+    AllowedSshIp: 0.0.0.0/0
+  tags:
+    Project: NT548
+    Environment: Test
+    ManagedBy: Taskcat
+
+tests:
+  default:
+    template: cloudformation/templates/main.yaml
+    parameters:
+      KeyPairName: nt548-keypair
+      AllowedSshIp: 0.0.0.0/0
+    regions:
+      - us-east-1

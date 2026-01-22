@@ -59,6 +59,17 @@ exit /b 1
 echo.
 echo Starting Terraform deployment...
 echo.
+
+REM Setup S3 backend first
+echo Setting up Terraform backend (S3 + DynamoDB)...
+pwsh -File scripts\setup-terraform-backend.ps1
+if %errorlevel% neq 0 (
+    echo Backend setup failed!
+    pause
+    exit /b 1
+)
+echo.
+
 cd terraform
 if not exist terraform.tfvars (
     if exist terraform.tfvars.example (

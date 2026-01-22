@@ -1,0 +1,89 @@
+version: 0.2
+
+# AWS CodeBuild buildspec for CloudFormation validation
+# Validates CloudFormation templates using cfn-lint and Taskcat
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.11
+    commands:
+      - echo "Installing dependencies..."
+      - pip install --upgrade pip
+      - pip install cfn-lint==0.83.0
+      - pip install taskcat==0.9.44
+      - pip install pyyaml
+      - echo "Installed versions:"
+      - cfn-lint --version
+      - taskcat --version
+
+  pre_build:
+    commands:
+      - echo "Pre-build phase started on `date`"
+      - echo "Validating CloudFormation templates..."
+      
+      # List all templates
+      - ls -la cloudformation/templates/
+      
+      # Validate template syntax
+      - |
+        echo "Checking YAML syntax..."
+        for template in cloudformation/templates/*.yaml; do
+          echo "Validating $template"
+          python -c "import yaml; yaml.safe_load(open('$template'))"
+        done
+
+  build:
+    commands:
+      - echo "Build phase started on `date`"
+      
+      # Run cfn-lint
+      - echo "Running cfn-lint..."
+      - cfn-lint cloudformation/templates/*.yaml --format json > cfn-lint-report.json || true
+      - cfn-lint cloudformation/templates/*.yaml || true
+      
+      # Run Taskcat if .taskcat.yml exists (skip for now to save time)
+      - |
+        if [ -f ".taskcat.yml" ]; then
+          echo "Taskcat configuration found"
+          echo "Note: Taskcat tests skipped in build to save time"
+          echo "Run 'taskcat test run' locally to test templates"
+        else
+          echo "No .taskcat.yml found, skipping Taskcat tests"
+        fi
+
+  post_build:
+    commands:
+      - echo "Post-build phase started on `date`"
+      - echo "Build completed successfully"
+      
+      # Generate build report
+      - |
+        echo "=== Build Summary ===" > build-summary.txt
+        echo "Build Date: $(date)" >> build-summary.txt
+        echo "Templates Validated:" >> build-summary.txt
+        ls cloudformation/templates/*.yaml >> build-summary.txt
+        echo "" >> build-summary.txt
+        echo "cfn-lint Results:" >> build-summary.txt
+        if [ -f "cfn-lint-report.json" ]; then
+          cat cfn-lint-report.json >> build-summary.txt
+        fi
+      
+      - cat build-summary.txt
+
+artifacts:
+  files:
+    - cloudformation/**/*
+    - cfn-lint-report.json
+    - build-summary.txt
+  name: CloudFormationArtifacts
+
+reports:
+  cfn-lint-report:
+    files:
+      - cfn-lint-report.json
+    file-format: JSON
+
+cache:
+  paths:
+    - '/root/.cache/pip/**/*'

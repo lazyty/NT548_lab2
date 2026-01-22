@@ -8,10 +8,12 @@ private_subnet_cidr = "10.0.2.0/24"
 availability_zone = "us-east-1a"
 
 # IMPORTANT: Change this to your actual IP address for security
-allowed_ssh_ip = "YOUR_IP_ADDRESS/32"
+# Get your IP: curl ifconfig.me
+allowed_ssh_ip = "0.0.0.0/0"
 
 # Create this key pair in AWS EC2 console first
-key_pair_name = "your-key-pair-name"
+# Or use: aws ec2 create-key-pair --key-name nt548-keypair
+key_pair_name = "nt548-keypair"
 
 common_tags = {
   Project     = "NT548-BaiTapThucHanh-01"

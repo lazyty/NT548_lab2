@@ -33,7 +33,7 @@ variable "availability_zone" {
 variable "allowed_ssh_ip" {
   description = "IP address allowed to SSH to public EC2"
   type        = string
-  default     = "0.0.0.0/0" # Change this to your IP for security
+  default     = "0.0.0.0/0"  # Change this to your IP for security
 }
 
 variable "key_pair_name" {

@@ -1,0 +1,29 @@
+# cfn-lint configuration file
+# https://github.com/aws-cloudformation/cfn-lint
+
+# Ignore specific rules
+ignore_checks:
+  - W2001  # Parameter not used (some parameters may be optional)
+  - I3011  # Availability Zone recommendations
+
+# Regions to validate against
+regions:
+  - us-east-1
+
+# Include specific check types
+include_checks:
+  - E  # Errors
+  - W  # Warnings
+  - I  # Informational
+
+# Configure specific rules
+configure_rules:
+  E3012:
+    strict: false  # Allow some property combinations
+
+# Append rules (custom rules directory)
+# append_rules:
+#   - custom_rules/
+
+# Override spec file
+# override_spec: custom-spec.json
