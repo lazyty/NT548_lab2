@@ -221,22 +221,7 @@ jobs:
     - name: Terraform Initialize
       run: |
         echo "Initializing Terraform with S3 backend..."
-        
-        # Get AWS Account ID for bucket name
-        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-        BUCKET_NAME="nt548-tfstate-${ACCOUNT_ID}"
-        
-        echo "Using bucket: ${BUCKET_NAME}"
-        
-        terraform init \
-          -input=false \
-          -reconfigure \
-          -backend-config="bucket=${BUCKET_NAME}" \
-          -backend-config="key=terraform.tfstate" \
-          -backend-config="region=${{ env.AWS_REGION }}" \
-          -backend-config="dynamodb_table=nt548-terraform-locks" \
-          -backend-config="encrypt=true"
-        
+        terraform init -input=false
         echo "Terraform initialized successfully"
 
     - name: Terraform Validate
