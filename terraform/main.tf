@@ -8,8 +8,9 @@ terraform {
     }
   }
   
+  # Backend will be configured via backend-config during init
+  # terraform init -backend-config="bucket=nt548-tfstate-<account-id>"
   backend "s3" {
-    bucket         = "nt548-terraform-state"
     key            = "terraform.tfstate"
     region         = "us-east-1"
     encrypt        = true
