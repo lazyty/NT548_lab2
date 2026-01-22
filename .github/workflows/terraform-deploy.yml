@@ -153,7 +153,9 @@ jobs:
       run: |
         echo "Setting up Terraform backend..."
         
-        BUCKET_NAME="nt548-terraform-state"
+        # Get AWS Account ID for unique bucket name
+        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+        BUCKET_NAME="nt548-tfstate-${ACCOUNT_ID}"
         
         echo "Bucket name: ${BUCKET_NAME}"
         
@@ -219,9 +221,13 @@ jobs:
       run: |
         echo "Initializing Terraform with S3 backend..."
         
+        # Get AWS Account ID for bucket name
+        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+        BUCKET_NAME="nt548-tfstate-${ACCOUNT_ID}"
+        
         terraform init \
           -input=false \
-          -backend-config="bucket=nt548-terraform-state" \
+          -backend-config="bucket=${BUCKET_NAME}" \
           -backend-config="key=terraform.tfstate" \
           -backend-config="region=${{ env.AWS_REGION }}" \
           -backend-config="dynamodb_table=nt548-terraform-locks" \
@@ -279,12 +285,16 @@ jobs:
       run: |
         echo "Cleaning up Terraform backend resources..."
         
+        # Get AWS Account ID
+        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+        BUCKET_NAME="nt548-tfstate-${ACCOUNT_ID}"
+        
         # Empty and delete S3 bucket
         echo "Emptying S3 bucket..."
-        aws s3 rm s3://nt548-terraform-state --recursive || true
+        aws s3 rm s3://${BUCKET_NAME} --recursive || true
         
         echo "Deleting S3 bucket..."
-        aws s3api delete-bucket --bucket nt548-terraform-state --region ${{ env.AWS_REGION }} || true
+        aws s3api delete-bucket --bucket ${BUCKET_NAME} --region ${{ env.AWS_REGION }} || true
         
         # Delete DynamoDB table
         echo "Deleting DynamoDB table..."
@@ -430,8 +440,12 @@ jobs:
       run: |
         echo "Verifying backend resources cleanup..."
         
+        # Get AWS Account ID
+        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+        BUCKET_NAME="nt548-tfstate-${ACCOUNT_ID}"
+        
         # Check S3 bucket
-        if aws s3api head-bucket --bucket nt548-terraform-state 2>/dev/null; then
+        if aws s3api head-bucket --bucket ${BUCKET_NAME} 2>/dev/null; then
           echo "WARNING: S3 bucket still exists"
           S3_EXISTS=1
         else

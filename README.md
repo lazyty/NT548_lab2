@@ -102,8 +102,9 @@ Project này triển khai một hạ tầng AWS hoàn chỉnh bao gồm:
 - Private Security Group (chỉ nhận traffic từ Public SG)
 
 **Backend:**
-- S3 Bucket: `nt548-terraform-state` (encrypted, versioned)
+- S3 Bucket: `nt548-tfstate-<account-id>` (encrypted, versioned)
 - DynamoDB Table: `nt548-terraform-locks` (state locking)
+- Lifecycle: Old versions deleted after 7 days
 
 **CI/CD Pipeline:**
 - CodeCommit Repository: Source control
@@ -117,25 +118,25 @@ Project này triển khai một hạ tầng AWS hoàn chỉnh bao gồm:
 ### Infrastructure Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                         VPC (10.0.0.0/16)                   │
-│                                                             │
+┌───────────────────────────────────────────────────────────┐
+│                         VPC (10.0.0.0/16)                 │
+│                                                           │
 │  ┌──────────────────────┐      ┌──────────────────────┐   │
 │  │  Public Subnet       │      │  Private Subnet      │   │
 │  │  (10.0.1.0/24)       │      │  (10.0.2.0/24)       │   │
 │  │                      │      │                      │   │
-│  │  ┌────────────┐      │      │  ┌────────────┐     │   │
-│  │  │ Public EC2 │      │      │  │Private EC2 │     │   │
-│  │  │ (Web Server)│◄────┼──────┼──┤            │     │   │
-│  │  └────────────┘      │      │  └────────────┘     │   │
-│  │         │            │      │         │           │   │
-│  │         │            │      │         │           │   │
-│  │  ┌──────▼──────┐    │      │  ┌──────▼──────┐   │   │
-│  │  │   IGW       │    │      │  │ NAT Gateway │   │   │
-│  │  └─────────────┘    │      │  └─────────────┘   │   │
+│  │  ┌────────────┐      │      │  ┌────────────┐      │   │
+│  │  │ Public EC2 │      │      │  │Private EC2 │      │   │
+│  │  │ (Web Server)│◄────┼──────┼──┤            │      │   │
+│  │  └────────────┘      │      │  └────────────┘      │   │
+│  │         │            │      │         │            │   │
+│  │         │            │      │         │            │   │
+│  │  ┌──────▼──────┐     │      │  ┌──────▼──────┐     │   │
+│  │  │   IGW       │     │      │  │ NAT Gateway │     │   │
+│  │  └─────────────┘     │      │  └─────────────┘     │   │
 │  └──────────────────────┘      └──────────────────────┘   │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+│                                                           │
+└───────────────────────────────────────────────────────────┘
                          │
                          ▼
                     Internet
@@ -144,11 +145,11 @@ Project này triển khai một hạ tầng AWS hoàn chỉnh bao gồm:
 ### CI/CD Pipeline Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                      AWS CodePipeline                           │
-│                                                                 │
+┌───────────────────────────────────────────────────────────────┐
+│                      AWS CodePipeline                         │
+│                                                               │
 │  ┌──────────┐    ┌──────────┐    ┌────────────────────────┐   │
-│  │  Source  │───▶│  Build   │───▶│       Deploy           │   │
+│  │  Source  │───▶│  Build   │───▶│       Deploy          │   │
 │  │          │    │          │    │                        │   │
 │  │CodeCommit│    │CodeBuild │    │ ┌────────────────────┐ │   │
 │  │          │    │          │    │ │ Create ChangeSet   │ │   │
@@ -164,8 +165,8 @@ Project này triển khai một hạ tầng AWS hoàn chỉnh bao gồm:
 │  │          │    │          │    │ │ Execute ChangeSet  │ │   │
 │  │          │    │          │    │ └────────────────────┘ │   │
 │  └──────────┘    └──────────┘    └────────────────────────┘   │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+│                                                               │
+└───────────────────────────────────────────────────────────────┘
 ```
 
 ## Yêu cầu
@@ -786,8 +787,9 @@ cd terraform
 terraform destroy
 
 # 2. Delete S3 bucket
-aws s3 rm s3://nt548-terraform-state --recursive
-aws s3api delete-bucket --bucket nt548-terraform-state --region us-east-1
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+aws s3 rm s3://nt548-tfstate-${ACCOUNT_ID} --recursive
+aws s3api delete-bucket --bucket nt548-tfstate-${ACCOUNT_ID} --region us-east-1
 
 # 3. Delete DynamoDB table
 aws dynamodb delete-table --table-name nt548-terraform-locks --region us-east-1

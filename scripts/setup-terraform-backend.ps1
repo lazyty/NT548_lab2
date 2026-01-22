@@ -7,12 +7,23 @@
 #>
 
 param(
-    [string]$BucketName = "nt548-terraform-state",
+    [string]$BucketName = "",
     [string]$DynamoDBTable = "nt548-terraform-locks",
     [string]$Region = "us-east-1"
 )
 
 $ErrorActionPreference = "Stop"
+
+# Get AWS Account ID if bucket name not provided
+if ([string]::IsNullOrEmpty($BucketName)) {
+    Write-Host "Getting AWS Account ID..." -ForegroundColor Cyan
+    $accountId = aws sts get-caller-identity --query Account --output text
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Failed to get AWS Account ID" -ForegroundColor Red
+        exit 1
+    }
+    $BucketName = "nt548-tfstate-$accountId"
+}
 
 Write-Host "=== Setting up Terraform Backend ===" -ForegroundColor Cyan
 Write-Host "Bucket: $BucketName" -ForegroundColor Yellow
