@@ -154,9 +154,8 @@ jobs:
       run: |
         echo "Setting up Terraform backend..."
         
-        # Get AWS Account ID for unique bucket name
-        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-        BUCKET_NAME="nt548-tfstate-${ACCOUNT_ID}"
+        # Bucket name is fixed in main.tf
+        BUCKET_NAME="nt548-tfstate-409964509537"
         
         echo "Bucket name: ${BUCKET_NAME}"
         
@@ -274,9 +273,8 @@ jobs:
       run: |
         echo "Removing DynamoDB lock entry..."
         
-        # Get AWS Account ID
-        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-        BUCKET_NAME="nt548-tfstate-${ACCOUNT_ID}"
+        # Bucket name is fixed
+        BUCKET_NAME="nt548-tfstate-409964509537"
         LOCK_ID="${BUCKET_NAME}/terraform.tfstate"
         
         # Try to delete lock entry (may not exist)
@@ -291,9 +289,8 @@ jobs:
       run: |
         echo "Cleaning up Terraform backend resources..."
         
-        # Get AWS Account ID
-        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-        BUCKET_NAME="nt548-tfstate-${ACCOUNT_ID}"
+        # Bucket name is fixed
+        BUCKET_NAME="nt548-tfstate-409964509537"
         
         # Empty and delete S3 bucket
         echo "Emptying S3 bucket..."
@@ -450,9 +447,8 @@ jobs:
       run: |
         echo "Verifying backend resources cleanup..."
         
-        # Get AWS Account ID
-        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-        BUCKET_NAME="nt548-tfstate-${ACCOUNT_ID}"
+        # Bucket name is fixed
+        BUCKET_NAME="nt548-tfstate-409964509537"
         
         # Check S3 bucket
         if aws s3api head-bucket --bucket ${BUCKET_NAME} 2>/dev/null; then
