@@ -83,6 +83,33 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "DynamoDB table created successfully!" -ForegroundColor Green
 }
 
+# Set lifecycle policy to delete old versions after 7 days
+Write-Host ""
+Write-Host "Setting lifecycle policy..." -ForegroundColor Cyan
+$lifecycleConfig = @"
+{
+    "Rules": [
+        {
+            "Id": "DeleteOldVersions",
+            "Status": "Enabled",
+            "NoncurrentVersionExpiration": {
+                "NoncurrentDays": 7
+            }
+        }
+    ]
+}
+"@
+
+aws s3api put-bucket-lifecycle-configuration `
+    --bucket $BucketName `
+    --lifecycle-configuration $lifecycleConfig
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "Lifecycle policy set: Old versions will be deleted after 7 days" -ForegroundColor Green
+} else {
+    Write-Host "Warning: Failed to set lifecycle policy" -ForegroundColor Yellow
+}
+
 Write-Host ""
 Write-Host "=== Backend Setup Complete ===" -ForegroundColor Green
 Write-Host ""
@@ -91,3 +118,7 @@ Write-Host "1. Backend configuration is already in terraform/main.tf" -Foregroun
 Write-Host "2. Run: cd terraform" -ForegroundColor White
 Write-Host "3. Run: terraform init -reconfigure" -ForegroundColor White
 Write-Host "4. Your state will be migrated to S3" -ForegroundColor White
+Write-Host ""
+Write-Host "Lifecycle Policy:" -ForegroundColor Cyan
+Write-Host "- Old state file versions will be deleted after 7 days" -ForegroundColor White
+Write-Host "- Current version is always kept" -ForegroundColor White
