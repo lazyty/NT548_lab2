@@ -226,8 +226,11 @@ jobs:
         ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
         BUCKET_NAME="nt548-tfstate-${ACCOUNT_ID}"
         
+        echo "Using bucket: ${BUCKET_NAME}"
+        
         terraform init \
           -input=false \
+          -reconfigure \
           -backend-config="bucket=${BUCKET_NAME}" \
           -backend-config="key=terraform.tfstate" \
           -backend-config="region=${{ env.AWS_REGION }}" \

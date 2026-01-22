@@ -8,14 +8,9 @@ terraform {
     }
   }
   
-  # Backend will be configured via backend-config during init
-  # terraform init -backend-config="bucket=nt548-tfstate-<account-id>"
-  backend "s3" {
-    key            = "terraform.tfstate"
-    region         = "us-east-1"
-    encrypt        = true
-    dynamodb_table = "nt548-terraform-locks"
-  }
+  # Backend will be configured entirely via -backend-config during init
+  # No backend block here - all values provided via command line
+  backend "s3" {}
 }
 
 provider "aws" {
