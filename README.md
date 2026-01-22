@@ -41,38 +41,38 @@ Project này triển khai một hạ tầng AWS hoàn chỉnh bao gồm:
 
 ```
 .
-├── terraform/                    # Terraform infrastructure
+├── terraform/                   # Terraform infrastructure
 │   ├── modules/                 # Terraform modules
-│   │   ├── vpc/                # VPC module
-│   │   ├── ec2/                # EC2 module
-│   │   └── security-groups/    # Security Groups module
-│   ├── main.tf                 # Main configuration với S3 backend
-│   ├── variables.tf            # Variable definitions
-│   ├── outputs.tf              # Output definitions
+│   │   ├── vpc/                 # VPC module
+│   │   ├── ec2/                 # EC2 module
+│   │   └── security-groups/     # Security Groups module
+│   ├── main.tf                  # Main configuration với S3 backend
+│   ├── variables.tf             # Variable definitions
+│   ├── outputs.tf               # Output definitions
 │   └── terraform.tfvars.example # Example variables
 │
-├── cloudformation/              # CloudFormation templates
+├── cloudformation/             # CloudFormation templates
 │   ├── templates/              # CloudFormation YAML templates
-│   │   └── main.yaml          # Main infrastructure template
+│   │   └── main.yaml           # Main infrastructure template
 │   ├── parameters/             # Parameter files
-│   │   └── dev.json           # Development parameters
+│   │   └── dev.json            # Development parameters
 │   ├── pipeline/               # CodePipeline templates
-│   │   └── codepipeline.yaml  # Pipeline stack template
+│   │   └── codepipeline.yaml   # Pipeline stack template
 │   └── buildspec.yml           # CodeBuild build specification
 │
-├── scripts/                     # Deployment scripts
+├── scripts/                         # Deployment scripts
 │   ├── setup-terraform-backend.ps1  # Setup S3 backend
 │   ├── setup-codecommit.ps1         # Setup CodeCommit repo
 │   ├── deploy-cloudformation.ps1    # Deploy CloudFormation
 │   ├── deploy-codepipeline.ps1      # Deploy CodePipeline
 │   └── destroy-infrastructure.ps1   # Cleanup resources
 │
-├── tests/                       # Test scripts
+├── tests/                      # Test scripts
 │   ├── run-tests.ps1           # Infrastructure tests
 │   ├── test-connectivity.ps1   # Connectivity tests
 │   └── test-cloudformation.ps1 # CloudFormation tests
 │
-├── .github/workflows/           # GitHub Actions workflows
+├── .github/workflows/          # GitHub Actions workflows
 │   └── terraform-deploy.yml    # Terraform CI/CD workflow
 │
 ├── .taskcat.yml                # Taskcat test configuration
