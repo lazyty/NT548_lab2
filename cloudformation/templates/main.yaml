@@ -19,6 +19,7 @@ Parameters:
     
   AvailabilityZone:
     Type: AWS::EC2::AvailabilityZone::Name
+    Default: us-east-1a
     Description: Availability zone for subnets
     
   AllowedSshIp:
@@ -28,6 +29,7 @@ Parameters:
     
   KeyPairName:
     Type: AWS::EC2::KeyPair::KeyName
+    Default: nt548-keypair
     Description: Name of AWS key pair for EC2 instances
     
   InstanceType:
