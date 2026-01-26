@@ -25,12 +25,12 @@ phases:
       # List all templates
       - ls -la cloudformation/templates/
       
-      # Validate template syntax
+      # Use AWS CLI to validate CloudFormation syntax (supports intrinsic functions)
       - |
-        echo "Checking YAML syntax..."
+        echo "Validating CloudFormation syntax with AWS CLI..."
         for template in cloudformation/templates/*.yaml; do
           echo "Validating $template"
-          python -c "import yaml; yaml.safe_load(open('$template'))"
+          aws cloudformation validate-template --template-body file://$template > /dev/null
         done
 
   build:
