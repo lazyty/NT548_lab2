@@ -81,19 +81,23 @@ if (![string]::IsNullOrEmpty($NotificationEmail)) {
 if ($stackFound) {
     Write-Host "Stack exists, updating..." -ForegroundColor Yellow
     
-    aws cloudformation update-stack `
+    $ErrorActionPreference = "Continue"
+    $updateOutput = aws cloudformation update-stack `
         --stack-name $StackName `
         --template-body file://cloudformation/pipeline/codepipeline.yaml `
         --parameters $parameters `
         --capabilities CAPABILITY_NAMED_IAM `
-        --region $Region
+        --region $Region 2>&1
+    $updateExitCode = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
     
-    if ($LASTEXITCODE -ne 0) {
-        $errorMsg = $Error[0].Exception.Message
+    if ($updateExitCode -ne 0) {
+        $errorMsg = $updateOutput | Out-String
         if ($errorMsg -like "*No updates are to be performed*") {
-            Write-Host "No updates needed" -ForegroundColor Yellow
+            Write-Host "No updates needed - Stack is already up to date" -ForegroundColor Green
         } else {
             Write-Host "Stack update failed" -ForegroundColor Red
+            Write-Host $errorMsg -ForegroundColor Gray
             exit 1
         }
     } else {
@@ -104,6 +108,7 @@ if ($stackFound) {
             Write-Host "Stack update failed or timed out" -ForegroundColor Red
             exit 1
         }
+        Write-Host "Stack updated successfully" -ForegroundColor Green
     }
 } else {
     Write-Host "Creating new stack..." -ForegroundColor Yellow
