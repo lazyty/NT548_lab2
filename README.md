@@ -18,7 +18,6 @@ CloudFormation, GitHub Actions, AWS CodePipeline và Jenkins
 - [Testing](#testing)
 - [CI/CD](#cicd)
   - [GitHub Actions](#github-actions)
-  - [AWS CodePipeline](#aws-codepipeline)
 - [Cleanup](#cleanup)
 - [Security Best Practices](#security-best-practices)
 - [Troubleshooting](#troubleshooting)
@@ -33,8 +32,6 @@ Project này triển khai một hạ tầng AWS hoàn chỉnh bao gồm:
 - **Security Groups** với rules phù hợp
 - **S3 Backend** để lưu trữ Terraform state
 - **DynamoDB** cho state locking
-- **AWS CodePipeline** tự động hóa CI/CD cho CloudFormation
-- **AWS CodeBuild** với cfn-lint và Taskcat validation
 
 ### Cấu trúc Project
 
@@ -608,9 +605,7 @@ Sau đó chạy connectivity tests sẽ tự động test SSH.
 
 ## CI/CD
 
-Project hỗ trợ 2 phương thức CI/CD:
-1. **GitHub Actions** - Cho Terraform deployment
-2. **AWS CodePipeline** - Cho CloudFormation deployment (Recommended)
+Project hỗ trợ CI/CD với **GitHub Actions** cho Terraform deployment.
 
 ### GitHub Actions
 
