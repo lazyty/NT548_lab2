@@ -11,7 +11,7 @@ phases:
       - echo "Installing dependencies..."
       - pip install --upgrade pip
       - pip install cfn-lint==0.83.0
-      - pip install taskcat==0.9.44
+      - pip install taskcat==0.9.42
       - pip install pyyaml
       - echo "Installed versions:"
       - cfn-lint --version

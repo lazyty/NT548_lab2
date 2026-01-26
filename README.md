@@ -13,9 +13,8 @@ CloudFormation, GitHub Actions, AWS CodePipeline và Jenkins
 - [Cài đặt](#cài-đặt)
 - [Triển khai](#triển-khai)
   - [Quick Start - Terraform](#option-1-quick-start-terraform)
-  - [Quick Start - CodePipeline (Tự động)](#option-2-quick-start-codepipeline-recommended)
-  - [Manual Terraform Deployment](#option-3-manual-terraform-deployment)
-  - [Manual CloudFormation Deployment](#option-4-manual-cloudformation-deployment)
+  - [Manual Terraform Deployment](#option-2-manual-terraform-deployment)
+  - [Manual CloudFormation Deployment](#option-3-manual-cloudformation-deployment)
 - [Testing](#testing)
 - [CI/CD](#cicd)
   - [GitHub Actions](#github-actions)
@@ -62,10 +61,9 @@ Project này triển khai một hạ tầng AWS hoàn chỉnh bao gồm:
 │
 ├── scripts/                         # Deployment scripts
 │   ├── setup-terraform-backend.ps1  # Setup S3 backend
-│   ├── setup-codecommit.ps1         # Setup CodeCommit repo
 │   ├── deploy-cloudformation.ps1    # Deploy CloudFormation
-│   ├── deploy-codepipeline.ps1      # Deploy CodePipeline
-│   └── destroy-infrastructure.ps1   # Cleanup resources
+│   ├── destroy-infrastructure.ps1   # Destroy infrastructure
+│   └── cleanup-all.ps1              # Cleanup all resources
 │
 ├── tests/                      # Test scripts
 │   ├── run-tests.ps1           # Infrastructure tests
@@ -263,149 +261,9 @@ Script sẽ tự động:
 
 ---
 
-### Option 2: Quick Start - CodePipeline (Recommended - Tự động hoàn toàn)
-
-**Triển khai CI/CD tự động với AWS CodePipeline, cfn-lint và Taskcat**
-
-#### Bước 1: Chuẩn bị
-```powershell
-# Kiểm tra AWS CLI
-aws sts get-caller-identity
-
-# Tạo key pair (nếu chưa có)
-aws ec2 create-key-pair --key-name nt548-keypair --query 'KeyMaterial' --output text > nt548-keypair.pem
-
-# Nếu key pair đã tồn tại, xóa và tạo lại
-aws ec2 delete-key-pair --key-name nt548-keypair
-aws ec2 create-key-pair --key-name nt548-keypair --query 'KeyMaterial' --output text > nt548-keypair.pem
-
-# Lấy IP của bạn
-curl ifconfig.me
-```
-
-#### Bước 2: Cấu hình parameters
-```powershell
-notepad cloudformation/parameters/dev.json
-```
-
-Sửa IP và key pair name:
-```json
-[
-  {
-    "ParameterKey": "KeyPairName",
-    "ParameterValue": "nt548-keypair"
-  },
-  {
-    "ParameterKey": "AllowedSshIp",
-    "ParameterValue": "YOUR_IP/32"
-  }
-]
-```
-
-#### Bước 3: Setup CodeCommit
-```powershell
-.\scripts\setup-codecommit.ps1
-```
-
-Script sẽ:
-- Tạo CodeCommit repository
-- Cấu hình Git credentials
-- Push code lên CodeCommit
-
-#### Bước 4: Deploy Pipeline
-```powershell
-.\scripts\deploy-codepipeline.ps1
-```
-
-Script sẽ tạo:
-- CodeBuild project với cfn-lint và Taskcat
-- CodePipeline với 3 stages (Source, Build, Deploy)
-- S3 bucket cho artifacts
-- IAM roles
-- EventBridge rule để auto-trigger
-
-Script sẽ hiển thị Pipeline URL. Copy URL để xem pipeline.
-
-#### Bước 5: Push code → Tự động deploy
-```powershell
-git add .
-git commit -m "Deploy infrastructure"
-git push codecommit main
-```
-
-Pipeline tự động chạy: Validate (cfn-lint) → Deploy (CloudFormation)
-
-#### Bước 6: Xem Pipeline
-```
-URL: https://console.aws.amazon.com/codesuite/codepipeline/pipelines
-Tìm: NT548-CloudFormation-Pipeline
-```
-
-Hoặc get URL:
-```powershell
-aws cloudformation describe-stacks --stack-name NT548-CodePipeline --query 'Stacks[0].Outputs[?OutputKey==`PipelineUrl`].OutputValue' --output text
-```
-
-#### Bước 7: Monitor
-```powershell
-# Pipeline state
-aws codepipeline get-pipeline-state --name NT548-CloudFormation-Pipeline
-
-# Build logs
-aws logs tail /aws/codebuild/NT548-CloudFormation-Build --follow
-
-# Stack status
-aws cloudformation describe-stacks --stack-name NT548-Infrastructure --query 'Stacks[0].StackStatus'
-```
-
-#### Pipeline Flow
-```
-Push code → CodeCommit → CodeBuild (cfn-lint) → CloudFormation (Deploy) ✅
-```
-
-**3 Stages tự động:**
-1. **Source**: Fetch code từ CodeCommit
-2. **Build**: Validate với cfn-lint và Taskcat
-3. **Deploy**: Deploy infrastructure (không cần approve)
-
-#### Validation Tools
-
-**cfn-lint**: Kiểm tra syntax
-```powershell
-cfn-lint cloudformation/templates/main.yaml
-```
-
-**Taskcat**: Test deployment
-```powershell
-taskcat test run
-```
-
-#### Troubleshooting
-
-**Pipeline không trigger:**
-```powershell
-aws codepipeline start-pipeline-execution --name NT548-CloudFormation-Pipeline
-```
-
-**cfn-lint failed:**
-```powershell
-cfn-lint cloudformation/templates/main.yaml
-# Fix errors và push lại
-```
-
-**Build failed:**
-```powershell
-aws logs tail /aws/codebuild/NT548-CloudFormation-Build --follow
-```
-
-**Deploy failed:**
-```powershell
-aws cloudformation describe-stack-events --stack-name NT548-Infrastructure --max-items 20
-```
-
 ---
 
-### Option 3: Manual Terraform Deployment
+### Option 2: Manual Terraform Deployment
 
 #### Bước 1: Setup S3 Backend
 
@@ -481,9 +339,97 @@ terraform output vpc_id
 terraform output public_ec2_ip
 ```
 
-### Option 4: Manual CloudFormation Deployment
+### Option 3: Manual CloudFormation Deployment
 
-#### Bước 1: Cấu hình Parameters
+#### A. Deploy qua AWS Console (Khuyến nghị - Dễ nhất)
+
+**Bước 1: Chuẩn bị parameters**
+
+Mở file `cloudformation/parameters/dev.json` và sửa:
+```json
+[
+  {
+    "ParameterKey": "KeyPairName",
+    "ParameterValue": "nt548-keypair"
+  },
+  {
+    "ParameterKey": "AllowedSshIp",
+    "ParameterValue": "YOUR_IP/32"
+  }
+]
+```
+
+**Bước 2: Mở AWS CloudFormation Console**
+
+1. Đăng nhập AWS Console: https://console.aws.amazon.com
+2. Chọn region **US East (N. Virginia)** ở góc phải trên
+3. Vào service **CloudFormation**
+4. Hoặc truy cập trực tiếp: https://console.aws.amazon.com/cloudformation
+
+**Bước 3: Create Stack**
+
+1. Click **Create stack** → **With new resources (standard)**
+2. Trong **Specify template**:
+   - Chọn **Upload a template file**
+   - Click **Choose file**
+   - Chọn file: `cloudformation/templates/main.yaml`
+   - Click **Next**
+
+**Bước 4: Specify stack details**
+
+1. **Stack name**: `NT548-Infrastructure`
+2. **Parameters**:
+   - **VpcCidr**: `10.0.0.0/16` (giữ mặc định)
+   - **PublicSubnetCidr**: `10.0.1.0/24` (giữ mặc định)
+   - **PrivateSubnetCidr**: `10.0.2.0/24` (giữ mặc định)
+   - **AvailabilityZone**: Chọn `us-east-1a`
+   - **AllowedSshIp**: Nhập IP của bạn (VD: `123.45.67.89/32`)
+   - **KeyPairName**: Nhập `nt548-keypair`
+   - **InstanceType**: `t2.micro` (giữ mặc định)
+3. Click **Next**
+
+**Bước 5: Configure stack options**
+
+1. **Tags** (optional):
+   - Key: `Project`, Value: `NT548`
+   - Key: `Environment`, Value: `Lab`
+2. **Permissions**: Để trống (dùng default)
+3. Click **Next**
+
+**Bước 6: Review**
+
+1. Review tất cả thông tin
+2. Scroll xuống cuối
+3. ✅ Check box: **I acknowledge that AWS CloudFormation might create IAM resources**
+4. Click **Submit**
+
+**Bước 7: Monitor Stack Creation**
+
+1. Stack status sẽ là **CREATE_IN_PROGRESS**
+2. Click tab **Events** để xem chi tiết
+3. Đợi 3-5 phút cho đến khi status là **CREATE_COMPLETE**
+4. Nếu có lỗi, status sẽ là **ROLLBACK_COMPLETE**
+
+**Bước 8: Xem Outputs**
+
+1. Click tab **Outputs**
+2. Bạn sẽ thấy:
+   - **VPCId**: ID của VPC
+   - **PublicEC2IP**: Public IP của EC2 instance
+   - **PrivateEC2IP**: Private IP của EC2 instance
+   - **PublicSubnetId**, **PrivateSubnetId**, etc.
+
+**Bước 9: Test Infrastructure**
+
+1. Copy **PublicEC2IP** từ Outputs
+2. Mở browser: `http://<PublicEC2IP>`
+3. Bạn sẽ thấy trang web: "NT548 Public EC2 Instance"
+
+---
+
+#### B. Deploy qua AWS CLI
+
+**Bước 1: Cấu hình Parameters**
 
 ```powershell
 notepad cloudformation/parameters/dev.json
@@ -497,37 +443,76 @@ Sửa các giá trị:
     "ParameterValue": "nt548-keypair"
   },
   {
-    "ParameterKey": "AllowedSSHIP",
-    "ParameterValue": "YOUR_IP_ADDRESS/32"
+    "ParameterKey": "AllowedSshIp",
+    "ParameterValue": "YOUR_IP/32"
   }
 ]
 ```
 
-#### Bước 2: Deploy Stack
+**Bước 2: Deploy Stack**
 
 ```powershell
 # Sử dụng script
-pwsh scripts/deploy-cloudformation.ps1
+.\scripts\deploy-cloudformation.ps1
 
 # Hoặc manual
-aws cloudformation create-stack \
-  --stack-name NT548-Infrastructure \
-  --template-body file://cloudformation/templates/main.yaml \
-  --parameters file://cloudformation/parameters/dev.json \
+aws cloudformation create-stack `
+  --stack-name NT548-Infrastructure `
+  --template-body file://cloudformation/templates/main.yaml `
+  --parameters file://cloudformation/parameters/dev.json `
   --capabilities CAPABILITY_IAM
 
 # Wait for completion
 aws cloudformation wait stack-create-complete --stack-name NT548-Infrastructure
 ```
 
-#### Bước 3: Xem Outputs
+**Bước 3: Xem Outputs**
 
 ```powershell
-aws cloudformation describe-stacks \
-  --stack-name NT548-Infrastructure \
-  --query 'Stacks[0].Outputs' \
+aws cloudformation describe-stacks `
+  --stack-name NT548-Infrastructure `
+  --query 'Stacks[0].Outputs' `
   --output table
 ```
+
+---
+
+#### C. Update Stack (nếu cần sửa)
+
+**Via Console:**
+1. Vào CloudFormation console
+2. Chọn stack **NT548-Infrastructure**
+3. Click **Update**
+4. Chọn **Replace current template** hoặc **Use current template**
+5. Update parameters nếu cần
+6. Click **Next** → **Next** → **Submit**
+
+**Via CLI:**
+```powershell
+aws cloudformation update-stack `
+  --stack-name NT548-Infrastructure `
+  --template-body file://cloudformation/templates/main.yaml `
+  --parameters file://cloudformation/parameters/dev.json `
+  --capabilities CAPABILITY_IAM
+```
+
+---
+
+#### D. Delete Stack
+
+**Via Console:**
+1. Vào CloudFormation console
+2. Chọn stack **NT548-Infrastructure**
+3. Click **Delete**
+4. Confirm deletion
+
+**Via CLI:**
+```powershell
+aws cloudformation delete-stack --stack-name NT548-Infrastructure
+aws cloudformation wait stack-delete-complete --stack-name NT548-Infrastructure
+```
+
+---
 
 ## Testing
 
@@ -537,7 +522,7 @@ Kiểm tra tất cả resources đã được tạo đúng:
 
 ```powershell
 cd tests
-pwsh run-tests.ps1
+.\run-tests.ps1
 ```
 
 Tests bao gồm:
@@ -685,30 +670,6 @@ Workflow tự động chạy khi:
    - Deployment summary
 
 ## Cleanup
-
-### Xóa CodePipeline và Infrastructure
-
-```powershell
-# Xóa tất cả
-.\scripts\cleanup-all.ps1 -Force
-
-# Hoặc xóa từng bước:
-
-# 1. Delete infrastructure stack
-aws cloudformation delete-stack --stack-name NT548-Infrastructure
-aws cloudformation wait stack-delete-complete --stack-name NT548-Infrastructure
-
-# 2. Delete pipeline stack
-aws cloudformation delete-stack --stack-name NT548-CodePipeline
-aws cloudformation wait stack-delete-complete --stack-name NT548-CodePipeline
-
-# 3. Delete artifacts bucket
-aws s3 rm s3://nt548-pipeline-artifacts-<account-id> --recursive
-aws s3api delete-bucket --bucket nt548-pipeline-artifacts-<account-id>
-
-# 4. Delete CodeCommit repository
-aws codecommit delete-repository --repository-name nt548-infrastructure
-```
 
 ### Xóa Infrastructure (giữ Backend) - Khuyến nghị
 

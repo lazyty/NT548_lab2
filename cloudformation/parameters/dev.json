@@ -17,7 +17,7 @@
   },
   {
     "ParameterKey": "AllowedSshIp",
-    "ParameterValue": "0.0.0.0/0"
+    "ParameterValue": "42.117.111.71/32"
   },
   {
     "ParameterKey": "KeyPairName",
