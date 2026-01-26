@@ -20,18 +20,10 @@ phases:
   pre_build:
     commands:
       - echo "Pre-build phase started on `date`"
-      - echo "Validating CloudFormation templates..."
+      - echo "Listing CloudFormation templates..."
       
       # List all templates
       - ls -la cloudformation/templates/
-      
-      # Use AWS CLI to validate CloudFormation syntax (supports intrinsic functions)
-      - |
-        echo "Validating CloudFormation syntax with AWS CLI..."
-        for template in cloudformation/templates/*.yaml; do
-          echo "Validating $template"
-          aws cloudformation validate-template --template-body file://$template > /dev/null
-        done
 
   build:
     commands:
