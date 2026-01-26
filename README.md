@@ -12,10 +12,10 @@ CloudFormation, GitHub Actions, AWS CodePipeline và Jenkins
 - [Yêu cầu](#yêu-cầu)
 - [Cài đặt](#cài-đặt)
 - [Triển khai](#triển-khai)
-  - [Quick Start](#option-1-quick-start-recommended)
-  - [Terraform Deployment](#option-2-manual-terraform-deployment)
-  - [CloudFormation Deployment](#option-3-cloudformation-deployment)
-  - [AWS CodePipeline Deployment](#option-4-aws-codepipeline-deployment-recommended)
+  - [Quick Start - Terraform](#option-1-quick-start-terraform)
+  - [Quick Start - CodePipeline (Tự động)](#option-2-quick-start-codepipeline-recommended)
+  - [Manual Terraform Deployment](#option-3-manual-terraform-deployment)
+  - [Manual CloudFormation Deployment](#option-4-manual-cloudformation-deployment)
 - [Testing](#testing)
 - [CI/CD](#cicd)
   - [GitHub Actions](#github-actions)
@@ -178,7 +178,7 @@ Project này triển khai một hạ tầng AWS hoàn chỉnh bao gồm:
 |------|---------|----------|
 | AWS CLI | Latest | https://aws.amazon.com/cli/ |
 | Terraform | >= 1.0 | https://www.terraform.io/downloads |
-| PowerShell | >= 7.0 | https://github.com/PowerShell/PowerShell |
+| PowerShell | >= 5.1 | Built-in Windows / https://github.com/PowerShell/PowerShell |
 | Git | Latest | https://git-scm.com/ |
 
 ### AWS Requirements
@@ -249,7 +249,7 @@ curl ifconfig.me
 
 ## Triển khai
 
-### Option 1: Quick Start (Recommended)
+### Option 1: Quick Start - Terraform
 
 ```cmd
 quick-start.bat
@@ -261,7 +261,151 @@ Script sẽ tự động:
 3. Cấu hình Terraform variables
 4. Deploy infrastructure
 
-### Option 2: Manual Terraform Deployment
+---
+
+### Option 2: Quick Start - CodePipeline (Recommended - Tự động hoàn toàn)
+
+**Triển khai CI/CD tự động với AWS CodePipeline, cfn-lint và Taskcat**
+
+#### Bước 1: Chuẩn bị
+```powershell
+# Kiểm tra AWS CLI
+aws sts get-caller-identity
+
+# Tạo key pair (nếu chưa có)
+aws ec2 create-key-pair --key-name nt548-keypair --query 'KeyMaterial' --output text > nt548-keypair.pem
+
+# Nếu key pair đã tồn tại, xóa và tạo lại
+aws ec2 delete-key-pair --key-name nt548-keypair
+aws ec2 create-key-pair --key-name nt548-keypair --query 'KeyMaterial' --output text > nt548-keypair.pem
+
+# Lấy IP của bạn
+curl ifconfig.me
+```
+
+#### Bước 2: Cấu hình parameters
+```powershell
+notepad cloudformation/parameters/dev.json
+```
+
+Sửa IP và key pair name:
+```json
+[
+  {
+    "ParameterKey": "KeyPairName",
+    "ParameterValue": "nt548-keypair"
+  },
+  {
+    "ParameterKey": "AllowedSshIp",
+    "ParameterValue": "YOUR_IP/32"
+  }
+]
+```
+
+#### Bước 3: Setup CodeCommit
+```powershell
+.\scripts\setup-codecommit.ps1
+```
+
+Script sẽ:
+- Tạo CodeCommit repository
+- Cấu hình Git credentials
+- Push code lên CodeCommit
+
+#### Bước 4: Deploy Pipeline
+```powershell
+.\scripts\deploy-codepipeline.ps1
+```
+
+Script sẽ tạo:
+- CodeBuild project với cfn-lint và Taskcat
+- CodePipeline với 3 stages (Source, Build, Deploy)
+- S3 bucket cho artifacts
+- IAM roles
+- EventBridge rule để auto-trigger
+
+Script sẽ hiển thị Pipeline URL. Copy URL để xem pipeline.
+
+#### Bước 5: Push code → Tự động deploy
+```powershell
+git add .
+git commit -m "Deploy infrastructure"
+git push codecommit main
+```
+
+Pipeline tự động chạy: Validate (cfn-lint) → Deploy (CloudFormation)
+
+#### Bước 6: Xem Pipeline
+```
+URL: https://console.aws.amazon.com/codesuite/codepipeline/pipelines
+Tìm: NT548-CloudFormation-Pipeline
+```
+
+Hoặc get URL:
+```powershell
+aws cloudformation describe-stacks --stack-name NT548-CodePipeline --query 'Stacks[0].Outputs[?OutputKey==`PipelineUrl`].OutputValue' --output text
+```
+
+#### Bước 7: Monitor
+```powershell
+# Pipeline state
+aws codepipeline get-pipeline-state --name NT548-CloudFormation-Pipeline
+
+# Build logs
+aws logs tail /aws/codebuild/NT548-CloudFormation-Build --follow
+
+# Stack status
+aws cloudformation describe-stacks --stack-name NT548-Infrastructure --query 'Stacks[0].StackStatus'
+```
+
+#### Pipeline Flow
+```
+Push code → CodeCommit → CodeBuild (cfn-lint) → CloudFormation (Deploy) ✅
+```
+
+**3 Stages tự động:**
+1. **Source**: Fetch code từ CodeCommit
+2. **Build**: Validate với cfn-lint và Taskcat
+3. **Deploy**: Deploy infrastructure (không cần approve)
+
+#### Validation Tools
+
+**cfn-lint**: Kiểm tra syntax
+```powershell
+cfn-lint cloudformation/templates/main.yaml
+```
+
+**Taskcat**: Test deployment
+```powershell
+taskcat test run
+```
+
+#### Troubleshooting
+
+**Pipeline không trigger:**
+```powershell
+aws codepipeline start-pipeline-execution --name NT548-CloudFormation-Pipeline
+```
+
+**cfn-lint failed:**
+```powershell
+cfn-lint cloudformation/templates/main.yaml
+# Fix errors và push lại
+```
+
+**Build failed:**
+```powershell
+aws logs tail /aws/codebuild/NT548-CloudFormation-Build --follow
+```
+
+**Deploy failed:**
+```powershell
+aws cloudformation describe-stack-events --stack-name NT548-Infrastructure --max-items 20
+```
+
+---
+
+### Option 3: Manual Terraform Deployment
 
 #### Bước 1: Setup S3 Backend
 
@@ -337,7 +481,7 @@ terraform output vpc_id
 terraform output public_ec2_ip
 ```
 
-### Option 3: CloudFormation Deployment
+### Option 4: Manual CloudFormation Deployment
 
 #### Bước 1: Cấu hình Parameters
 
@@ -540,232 +684,31 @@ Workflow tự động chạy khi:
    - Success/Failure notifications
    - Deployment summary
 
-### AWS CodePipeline
+## Cleanup
 
-AWS CodePipeline cung cấp CI/CD tự động cho CloudFormation với validation và testing.
-
-#### Architecture
-
-```
-CodeCommit (Source) → CodeBuild (Validate) → CloudFormation (Deploy)
-                           │
-                           ├─ cfn-lint
-                           ├─ Taskcat
-                           └─ YAML validation
-```
-
-#### Setup Steps
-
-**1. Setup CodeCommit Repository**
-```powershell
-pwsh scripts/setup-codecommit.ps1
-```
-
-**2. Deploy Pipeline**
-```powershell
-pwsh scripts/deploy-codepipeline.ps1 -NotificationEmail "your-email@example.com"
-```
-
-**3. Push Changes**
-```bash
-git add .
-git commit -m "Update infrastructure"
-git push codecommit main
-```
-
-#### Pipeline Stages
-
-**Source Stage:**
-- Monitors CodeCommit repository
-- Auto-triggers on push to main branch
-- Fetches latest code
-
-**Build Stage (CodeBuild):**
-- Installs cfn-lint and Taskcat
-- Validates CloudFormation syntax
-- Runs cfn-lint checks:
-  - Resource validation
-  - Best practices
-  - Security checks
-- Runs Taskcat tests:
-  - Deploy test stacks
-  - Validate resources
-  - Cleanup after tests
-- Generates validation reports
-
-**Deploy Stage:**
-- Creates CloudFormation Change Set
-- Waits for manual approval
-- Executes Change Set to deploy infrastructure
-
-#### cfn-lint Rules
-
-cfn-lint validates CloudFormation templates against AWS best practices:
-
-**Error Rules (E):**
-- E1001: Basic CloudFormation syntax
-- E2001: Parameter validation
-- E3001: Resource type validation
-- E3002: Resource property validation
-
-**Warning Rules (W):**
-- W2001: Parameter usage
-- W3002: Resource property best practices
-
-**Informational Rules (I):**
-- I3011: Availability Zone recommendations
-- I3012: Resource naming conventions
-
-Example `.cfnlintrc`:
-```yaml
-ignore_checks:
-  - W2001  # Ignore unused parameter warnings
-regions:
-  - us-east-1
-```
-
-#### Taskcat Configuration
-
-`.taskcat.yml` defines test scenarios:
-
-```yaml
-project:
-  name: NT548-CloudFormation
-  owner: NT548-Team
-  regions:
-    - us-east-1
-  parameters:
-    KeyPairName: nt548-keypair
-    AllowedSSHIP: 0.0.0.0/0
-
-tests:
-  default:
-    template: cloudformation/templates/main.yaml
-    regions:
-      - us-east-1
-```
-
-Taskcat will:
-1. Create test stacks in specified regions
-2. Validate all resources are created
-3. Run for ~15 minutes
-4. Delete test stacks automatically
-
-#### Manual Approval
-
-Pipeline pauses at approval stage:
-
-**Via AWS Console:**
-1. Go to CodePipeline console
-2. Click on pipeline execution
-3. Review Change Set
-4. Click "Review" → "Approve" or "Reject"
-
-**Via AWS CLI:**
-```bash
-# Get approval token
-aws codepipeline get-pipeline-state --name NT548-CloudFormation-Pipeline
-
-# Approve
-aws codepipeline put-approval-result \
-  --pipeline-name NT548-CloudFormation-Pipeline \
-  --stage-name Deploy \
-  --action-name ApprovalRequired \
-  --result status=Approved,summary="Approved by admin" \
-  --token <token-from-get-pipeline-state>
-```
-
-#### Monitoring
-
-**View Pipeline Status:**
-```powershell
-# Pipeline state
-aws codepipeline get-pipeline-state --name NT548-CloudFormation-Pipeline
-
-# Execution history
-aws codepipeline list-pipeline-executions --pipeline-name NT548-CloudFormation-Pipeline --max-results 5
-
-# Latest execution
-aws codepipeline get-pipeline-execution \
-  --pipeline-name NT548-CloudFormation-Pipeline \
-  --pipeline-execution-id <execution-id>
-```
-
-**View Build Logs:**
-```powershell
-# List builds
-aws codebuild list-builds-for-project --project-name NT548-CloudFormation-Build
-
-# Get build details
-aws codebuild batch-get-builds --ids <build-id>
-
-# Stream logs
-aws logs tail /aws/codebuild/NT548-CloudFormation-Build --follow
-```
-
-**CloudWatch Logs:**
-- CodeBuild logs: `/aws/codebuild/NT548-CloudFormation-Build`
-- CloudFormation events: CloudFormation console
-
-#### Trigger Pipeline
-
-**Auto-trigger (Recommended):**
-```bash
-# Any push to main branch triggers pipeline
-git push codecommit main
-```
-
-**Manual trigger:**
-```powershell
-# Using AWS CLI
-aws codepipeline start-pipeline-execution --name NT548-CloudFormation-Pipeline
-```
-
-#### Pipeline Artifacts
-
-Artifacts stored in S3 bucket: `nt548-pipeline-artifacts-<account-id>`
-
-Contents:
-- Source code from CodeCommit
-- Build outputs (cfn-lint reports, Taskcat results)
-- CloudFormation templates
-- Validation reports
-
-Lifecycle: Artifacts deleted after 30 days
-
-#### Cost Optimization
-
-**Free Tier:**
-- CodeCommit: 5 users, 50GB storage, 10,000 requests/month
-- CodeBuild: 100 build minutes/month
-- CodePipeline: 1 active pipeline/month
-
-**Estimated Monthly Cost (beyond free tier):**
-- CodePipeline: $1/active pipeline
-- CodeBuild: $0.005/build minute
-- S3 Storage: $0.023/GB
-- Data Transfer: Varies
-
-**Tips:**
-- Use `--no-delete` flag in Taskcat for debugging only
-- Clean up old artifacts regularly
-- Use smaller CodeBuild instance (BUILD_GENERAL1_SMALL)
-
-#### Cleanup Pipeline
+### Xóa CodePipeline và Infrastructure
 
 ```powershell
-# Delete pipeline stack
+# Xóa tất cả
+.\scripts\cleanup-all.ps1 -Force
+
+# Hoặc xóa từng bước:
+
+# 1. Delete infrastructure stack
+aws cloudformation delete-stack --stack-name NT548-Infrastructure
+aws cloudformation wait stack-delete-complete --stack-name NT548-Infrastructure
+
+# 2. Delete pipeline stack
 aws cloudformation delete-stack --stack-name NT548-CodePipeline
+aws cloudformation wait stack-delete-complete --stack-name NT548-CodePipeline
 
-# Delete artifacts bucket
+# 3. Delete artifacts bucket
 aws s3 rm s3://nt548-pipeline-artifacts-<account-id> --recursive
 aws s3api delete-bucket --bucket nt548-pipeline-artifacts-<account-id>
 
-# Delete CodeCommit repository
+# 4. Delete CodeCommit repository
 aws codecommit delete-repository --repository-name nt548-infrastructure
 ```
-
-## Cleanup
 
 ### Xóa Infrastructure (giữ Backend) - Khuyến nghị
 
