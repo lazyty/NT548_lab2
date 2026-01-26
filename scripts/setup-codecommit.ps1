@@ -57,8 +57,19 @@ Write-Host ""
 
 # Configure Git credentials helper
 Write-Host "Configuring Git credentials helper..." -ForegroundColor Cyan
-git config --global credential.helper '!aws codecommit credential-helper $@'
+git config --global credential.helper "!aws codecommit credential-helper `$@"
 git config --global credential.UseHttpPath true
+
+# Verify AWS credentials work
+Write-Host "Verifying AWS credentials..." -ForegroundColor Cyan
+$identity = aws sts get-caller-identity 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "AWS credentials not configured properly!" -ForegroundColor Red
+    Write-Host "Please run: aws configure" -ForegroundColor Yellow
+    exit 1
+}
+Write-Host "AWS credentials verified" -ForegroundColor Green
+Write-Host ""
 
 # Check if git remote exists
 $remoteExists = $null
@@ -107,19 +118,30 @@ if ([string]::IsNullOrEmpty($status)) {
 
 # Push to CodeCommit
 Write-Host "Pushing to CodeCommit..." -ForegroundColor Yellow
-git push codecommit $currentBranch
+Write-Host "Note: This uses AWS IAM credentials, not GitHub credentials" -ForegroundColor Cyan
 
-if ($LASTEXITCODE -ne 0) {
+$pushOutput = git push codecommit $currentBranch 2>&1
+$pushSuccess = $LASTEXITCODE -eq 0
+
+if (-not $pushSuccess) {
     Write-Host "Failed to push to CodeCommit" -ForegroundColor Red
     Write-Host ""
-    Write-Host "Troubleshooting:" -ForegroundColor Yellow
-    Write-Host "1. Make sure AWS CLI is configured with proper credentials" -ForegroundColor White
-    Write-Host "2. Verify IAM user has CodeCommit permissions" -ForegroundColor White
-    Write-Host "3. Check if Git credential helper is configured correctly" -ForegroundColor White
+    Write-Host "Error details:" -ForegroundColor Yellow
+    Write-Host $pushOutput -ForegroundColor Gray
     Write-Host ""
-    Write-Host "Manual setup:" -ForegroundColor Yellow
-    Write-Host "git config --global credential.helper '!aws codecommit credential-helper `$@'" -ForegroundColor White
-    Write-Host "git config --global credential.UseHttpPath true" -ForegroundColor White
+    Write-Host "Troubleshooting:" -ForegroundColor Yellow
+    Write-Host "1. Make sure AWS CLI is configured: aws configure" -ForegroundColor White
+    Write-Host "2. Verify IAM user has CodeCommit permissions:" -ForegroundColor White
+    Write-Host "   - AWSCodeCommitPowerUser (recommended)" -ForegroundColor White
+    Write-Host "   - Or codecommit:GitPull and codecommit:GitPush" -ForegroundColor White
+    Write-Host "3. Test AWS credentials: aws sts get-caller-identity" -ForegroundColor White
+    Write-Host "4. Reconfigure Git credential helper:" -ForegroundColor White
+    Write-Host '   git config --global credential.helper "!aws codecommit credential-helper $@"' -ForegroundColor White
+    Write-Host "   git config --global credential.UseHttpPath true" -ForegroundColor White
+    Write-Host ""
+    Write-Host "5. If still failing, try HTTPS with credential helper:" -ForegroundColor White
+    Write-Host "   git config --global credential.helper store" -ForegroundColor White
+    Write-Host "   Then manually enter AWS credentials when prompted" -ForegroundColor White
     exit 1
 }
 
