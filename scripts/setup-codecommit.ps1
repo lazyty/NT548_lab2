@@ -120,14 +120,14 @@ if ([string]::IsNullOrEmpty($status)) {
 Write-Host "Pushing to CodeCommit..." -ForegroundColor Yellow
 Write-Host "Note: This uses AWS IAM credentials, not GitHub credentials" -ForegroundColor Cyan
 
-$pushOutput = git push codecommit $currentBranch 2>&1
+# Suppress stderr warnings from git progress
+$ErrorActionPreference = "Continue"
+git push codecommit $currentBranch
 $pushSuccess = $LASTEXITCODE -eq 0
+$ErrorActionPreference = "Stop"
 
 if (-not $pushSuccess) {
     Write-Host "Failed to push to CodeCommit" -ForegroundColor Red
-    Write-Host ""
-    Write-Host "Error details:" -ForegroundColor Yellow
-    Write-Host $pushOutput -ForegroundColor Gray
     Write-Host ""
     Write-Host "Troubleshooting:" -ForegroundColor Yellow
     Write-Host "1. Make sure AWS CLI is configured: aws configure" -ForegroundColor White
