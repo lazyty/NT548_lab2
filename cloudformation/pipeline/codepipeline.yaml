@@ -134,7 +134,7 @@ Resources:
                 ActionMode: CREATE_UPDATE
                 StackName: !Ref StackName
                 TemplatePath: BuildOutput::cloudformation/templates/main.yaml
-                TemplateConfiguration: BuildOutput::cloudformation/parameters/dev.json
+                Parameters: cloudformation/parameters/dev.json
                 Capabilities: CAPABILITY_IAM
                 RoleArn: !GetAtt CloudFormationRole.Arn
               InputArtifacts:
