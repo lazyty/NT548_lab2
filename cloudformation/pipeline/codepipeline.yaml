@@ -134,7 +134,12 @@ Resources:
                 ActionMode: CREATE_UPDATE
                 StackName: !Ref StackName
                 TemplatePath: BuildOutput::cloudformation/templates/main.yaml
-                Parameters: cloudformation/parameters/dev.json
+                ParameterOverrides: |
+                  {
+                    "KeyPairName": "nt548-keypair",
+                    "AvailabilityZone": "us-east-1a",
+                    "AllowedSshIp": "42.117.111.71/32"
+                  }
                 Capabilities: CAPABILITY_IAM
                 RoleArn: !GetAtt CloudFormationRole.Arn
               InputArtifacts:
