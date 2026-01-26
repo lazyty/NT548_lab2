@@ -1,9 +1,10 @@
-#!/usr/bin/env pwsh
 <#
 .SYNOPSIS
     Setup AWS CodeCommit repository and push code
 .DESCRIPTION
     Creates CodeCommit repository and pushes local code to it
+.NOTES
+    Compatible with PowerShell 5.1+
 #>
 
 param(
@@ -21,9 +22,15 @@ Write-Host ""
 
 # Check if repository exists
 Write-Host "Checking if repository exists..." -ForegroundColor Cyan
-$repoExists = aws codecommit get-repository --repository-name $RepositoryName --region $Region 2>$null
+$repoExists = $null
+try {
+    $repoExists = aws codecommit get-repository --repository-name $RepositoryName --region $Region 2>&1
+    $repoFound = $LASTEXITCODE -eq 0
+} catch {
+    $repoFound = $false
+}
 
-if ($LASTEXITCODE -eq 0) {
+if ($repoFound) {
     Write-Host "Repository already exists: $RepositoryName" -ForegroundColor Green
     $repoInfo = $repoExists | ConvertFrom-Json
     $cloneUrl = $repoInfo.repositoryMetadata.cloneUrlHttp
@@ -54,9 +61,15 @@ git config --global credential.helper '!aws codecommit credential-helper $@'
 git config --global credential.UseHttpPath true
 
 # Check if git remote exists
-$remoteExists = git remote get-url codecommit 2>$null
+$remoteExists = $null
+try {
+    $remoteExists = git remote get-url codecommit 2>&1
+    $hasRemote = $LASTEXITCODE -eq 0
+} catch {
+    $hasRemote = $false
+}
 
-if ($LASTEXITCODE -eq 0) {
+if ($hasRemote) {
     Write-Host "Git remote 'codecommit' already exists" -ForegroundColor Yellow
     Write-Host "Updating remote URL..." -ForegroundColor Yellow
     git remote set-url codecommit $cloneUrl

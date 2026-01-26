@@ -121,19 +121,18 @@ Resources:
                 - Name: BuildOutput
               RunOrder: 1
 
-        # Deploy Stage - CloudFormation
+        # Deploy Stage - CloudFormation (Fully Automated)
         - Name: Deploy
           Actions:
-            - Name: CreateChangeSet
+            - Name: DeployInfrastructure
               ActionTypeId:
                 Category: Deploy
                 Owner: AWS
                 Provider: CloudFormation
                 Version: '1'
               Configuration:
-                ActionMode: CHANGE_SET_REPLACE
+                ActionMode: CREATE_UPDATE
                 StackName: !Ref StackName
-                ChangeSetName: !Sub '${StackName}-ChangeSet'
                 TemplatePath: BuildOutput::cloudformation/templates/main.yaml
                 TemplateConfiguration: BuildOutput::cloudformation/parameters/dev.json
                 Capabilities: CAPABILITY_IAM
@@ -141,28 +140,6 @@ Resources:
               InputArtifacts:
                 - Name: BuildOutput
               RunOrder: 1
-
-            - Name: ApprovalRequired
-              ActionTypeId:
-                Category: Approval
-                Owner: AWS
-                Provider: Manual
-                Version: '1'
-              Configuration:
-                CustomData: 'Please review the change set and approve deployment'
-              RunOrder: 2
-
-            - Name: ExecuteChangeSet
-              ActionTypeId:
-                Category: Deploy
-                Owner: AWS
-                Provider: CloudFormation
-                Version: '1'
-              Configuration:
-                ActionMode: CHANGE_SET_EXECUTE
-                StackName: !Ref StackName
-                ChangeSetName: !Sub '${StackName}-ChangeSet'
-              RunOrder: 3
 
       Tags:
         - Key: Project

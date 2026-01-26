@@ -1,9 +1,10 @@
-#!/usr/bin/env pwsh
 <#
 .SYNOPSIS
     Cleanup all NT548 infrastructure - No errors version
 .DESCRIPTION
     Destroys all infrastructure, backend, and resources without showing errors
+.NOTES
+    Compatible with PowerShell 5.1+
 #>
 
 param(

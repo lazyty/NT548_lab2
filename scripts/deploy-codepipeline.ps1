@@ -1,9 +1,10 @@
-#!/usr/bin/env pwsh
 <#
 .SYNOPSIS
     Deploy AWS CodePipeline for CloudFormation
 .DESCRIPTION
     Deploys CodePipeline stack for automated CloudFormation deployment
+.NOTES
+    Compatible with PowerShell 5.1+
 #>
 
 param(
@@ -26,11 +27,17 @@ Write-Host ""
 
 # Check if repository exists
 Write-Host "Checking if CodeCommit repository exists..." -ForegroundColor Cyan
-$repoExists = aws codecommit get-repository --repository-name $RepositoryName --region $Region 2>$null
+$repoExists = $null
+try {
+    $repoExists = aws codecommit get-repository --repository-name $RepositoryName --region $Region 2>&1
+    $repoFound = $LASTEXITCODE -eq 0
+} catch {
+    $repoFound = $false
+}
 
-if ($LASTEXITCODE -ne 0) {
+if (-not $repoFound) {
     Write-Host "Repository not found: $RepositoryName" -ForegroundColor Red
-    Write-Host "Please run: pwsh scripts/setup-codecommit.ps1" -ForegroundColor Yellow
+    Write-Host "Please run: .\scripts\setup-codecommit.ps1" -ForegroundColor Yellow
     exit 1
 }
 
@@ -53,7 +60,13 @@ Write-Host ""
 
 # Check if stack exists
 Write-Host "Checking if stack exists..." -ForegroundColor Cyan
-$stackExists = aws cloudformation describe-stacks --stack-name $StackName --region $Region 2>$null
+$stackExists = $null
+try {
+    $stackExists = aws cloudformation describe-stacks --stack-name $StackName --region $Region 2>&1
+    $stackFound = $LASTEXITCODE -eq 0
+} catch {
+    $stackFound = $false
+}
 
 $parameters = @(
     "ParameterKey=RepositoryName,ParameterValue=$RepositoryName",
@@ -65,7 +78,7 @@ if (![string]::IsNullOrEmpty($NotificationEmail)) {
     $parameters += "ParameterKey=NotificationEmail,ParameterValue=$NotificationEmail"
 }
 
-if ($LASTEXITCODE -eq 0) {
+if ($stackFound) {
     Write-Host "Stack exists, updating..." -ForegroundColor Yellow
     
     aws cloudformation update-stack `
@@ -141,4 +154,3 @@ Write-Host "Next steps:" -ForegroundColor Cyan
 Write-Host "1. View pipeline: $pipelineUrl" -ForegroundColor White
 Write-Host "2. Push changes to trigger pipeline: git push codecommit main" -ForegroundColor White
 Write-Host "3. Monitor pipeline execution in AWS Console" -ForegroundColor White
-Write-Host "4. Approve manual approval step when ready" -ForegroundColor White
