@@ -184,8 +184,6 @@ Resources:
             Principal:
               Service: codepipeline.amazonaws.com
             Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AWSCodePipelineFullAccess
       Policies:
         - PolicyName: CodePipelinePolicy
           PolicyDocument:
