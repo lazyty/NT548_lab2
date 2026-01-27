@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - AUTH_SERVICE_URL=http://auth-service:3001
+      - USER_SERVICE_URL=http://user-service:3002
+      - PRODUCT_SERVICE_URL=http://product-service:3003
+      - NODE_ENV=production
+    depends_on:
+      - auth-service
+      - user-service
+      - product-service
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+  auth-service:
+    build: ./auth-service
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - JWT_SECRET=your-secret-key-change-in-production
+      - JWT_EXPIRES_IN=24h
+      - NODE_ENV=production
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+  user-service:
+    build: ./user-service
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - NODE_ENV=production
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+  product-service:
+    build: ./product-service
+    ports:
+      - "3003:3003"
+    environment:
+      - PORT=3003
+      - NODE_ENV=production
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+networks:
+  microservices-network:
+    driver: bridge

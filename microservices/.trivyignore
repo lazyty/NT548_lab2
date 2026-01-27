@@ -1,0 +1,5 @@
+# Trivy ignore file
+# Add CVE IDs to ignore specific vulnerabilities
+
+# Example:
+# CVE-2021-44228

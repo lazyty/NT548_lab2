@@ -1,0 +1,284 @@
+pipeline {
+    agent any
+    
+    tools {
+        nodejs 'NodeJS-18'
+    }
+    
+    environment {
+        DOCKER_REGISTRY = 'docker.io'
+        DOCKER_CREDENTIALS_ID = 'docker-hub-credentials'
+        SONARQUBE_SERVER = 'SonarQube'
+        BUILD_TAG = "${env.BUILD_NUMBER}"
+        TRIVY_SEVERITY = 'HIGH,CRITICAL'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+                echo '✓ Code checked out successfully'
+            }
+        }
+        
+        stage('Install Dependencies') {
+            parallel {
+                stage('API Gateway') {
+                    steps {
+                        dir('microservices/api-gateway') {
+                            sh 'npm ci'
+                        }
+                    }
+                }
+                stage('Auth Service') {
+                    steps {
+                        dir('microservices/auth-service') {
+                            sh 'npm ci'
+                        }
+                    }
+                }
+                stage('User Service') {
+                    steps {
+                        dir('microservices/user-service') {
+                            sh 'npm ci'
+                        }
+                    }
+                }
+                stage('Product Service') {
+                    steps {
+                        dir('microservices/product-service') {
+                            sh 'npm ci'
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Run Tests with Coverage') {
+            parallel {
+                stage('Test API Gateway') {
+                    steps {
+                        dir('microservices/api-gateway') {
+                            sh 'npm test -- --coverage'
+                        }
+                    }
+                }
+                stage('Test Auth Service') {
+                    steps {
+                        dir('microservices/auth-service') {
+                            sh 'npm test -- --coverage'
+                        }
+                    }
+                }
+                stage('Test User Service') {
+                    steps {
+                        dir('microservices/user-service') {
+                            sh 'npm test -- --coverage'
+                        }
+                    }
+                }
+                stage('Test Product Service') {
+                    steps {
+                        dir('microservices/product-service') {
+                            sh 'npm test -- --coverage'
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    def scannerHome = tool 'SonarQubeScanner'
+                    withSonarQubeEnv('SonarQube') {
+                        dir('microservices') {
+                            sh """
+                                ${scannerHome}/bin/sonar-scanner \
+                                -Dsonar.projectKey=microservices-app \
+                                -Dsonar.projectName='Microservices Application' \
+                                -Dsonar.sources=. \
+                                -Dsonar.exclusions='**/node_modules/**,**/coverage/**,**/dist/**,**/*.test.js' \
+                                -Dsonar.javascript.lcov.reportPaths='api-gateway/coverage/lcov.info,auth-service/coverage/lcov.info,user-service/coverage/lcov.info,product-service/coverage/lcov.info'
+                            """
+                        }
+                    }
+                }
+                echo '✓ SonarQube analysis completed'
+            }
+        }
+        
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+                echo '✓ Quality Gate passed'
+            }
+        }
+        
+        stage('Build Docker Images') {
+            parallel {
+                stage('Build API Gateway') {
+                    steps {
+                        dir('microservices/api-gateway') {
+                            sh 'docker build -t api-gateway:${BUILD_NUMBER} .'
+                            sh 'docker tag api-gateway:${BUILD_NUMBER} api-gateway:latest'
+                        }
+                    }
+                }
+                stage('Build Auth Service') {
+                    steps {
+                        dir('microservices/auth-service') {
+                            sh 'docker build -t auth-service:${BUILD_NUMBER} .'
+                            sh 'docker tag auth-service:${BUILD_NUMBER} auth-service:latest'
+                        }
+                    }
+                }
+                stage('Build User Service') {
+                    steps {
+                        dir('microservices/user-service') {
+                            sh 'docker build -t user-service:${BUILD_NUMBER} .'
+                            sh 'docker tag user-service:${BUILD_NUMBER} user-service:latest'
+                        }
+                    }
+                }
+                stage('Build Product Service') {
+                    steps {
+                        dir('microservices/product-service') {
+                            sh 'docker build -t product-service:${BUILD_NUMBER} .'
+                            sh 'docker tag product-service:${BUILD_NUMBER} product-service:latest'
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Trivy Security Scan') {
+            parallel {
+                stage('Scan API Gateway') {
+                    steps {
+                        script {
+                            sh """
+                                trivy image --severity ${TRIVY_SEVERITY} \
+                                --format json --output trivy-api-gateway.json \
+                                api-gateway:${BUILD_NUMBER}
+                            """
+                            sh "trivy image --severity ${TRIVY_SEVERITY} api-gateway:${BUILD_NUMBER}"
+                        }
+                    }
+                }
+                stage('Scan Auth Service') {
+                    steps {
+                        script {
+                            sh """
+                                trivy image --severity ${TRIVY_SEVERITY} \
+                                --format json --output trivy-auth-service.json \
+                                auth-service:${BUILD_NUMBER}
+                            """
+                            sh "trivy image --severity ${TRIVY_SEVERITY} auth-service:${BUILD_NUMBER}"
+                        }
+                    }
+                }
+                stage('Scan User Service') {
+                    steps {
+                        script {
+                            sh """
+                                trivy image --severity ${TRIVY_SEVERITY} \
+                                --format json --output trivy-user-service.json \
+                                user-service:${BUILD_NUMBER}
+                            """
+                            sh "trivy image --severity ${TRIVY_SEVERITY} user-service:${BUILD_NUMBER}"
+                        }
+                    }
+                }
+                stage('Scan Product Service') {
+                    steps {
+                        script {
+                            sh """
+                                trivy image --severity ${TRIVY_SEVERITY} \
+                                --format json --output trivy-product-service.json \
+                                product-service:${BUILD_NUMBER}
+                            """
+                            sh "trivy image --severity ${TRIVY_SEVERITY} product-service:${BUILD_NUMBER}"
+                        }
+                    }
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'trivy-*.json', allowEmptyArchive: true
+                }
+            }
+        }
+        
+        stage('Push to Docker Registry') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    docker.withRegistry('https://index.docker.io/v1/', DOCKER_CREDENTIALS_ID) {
+                        sh """
+                            docker push api-gateway:${BUILD_NUMBER}
+                            docker push auth-service:${BUILD_NUMBER}
+                            docker push user-service:${BUILD_NUMBER}
+                            docker push product-service:${BUILD_NUMBER}
+                        """
+                    }
+                }
+                echo '✓ Images pushed to Docker Hub'
+            }
+        }
+        
+        stage('Deploy to Docker') {
+            steps {
+                echo 'Deploying microservices with Docker Compose...'
+                dir('microservices') {
+                    sh 'docker-compose down || true'
+                    sh 'docker-compose up -d'
+                }
+                echo '✓ Microservices deployed successfully'
+                
+                sleep(time: 15, unit: 'SECONDS')
+                
+                script {
+                    def services = [
+                        [name: 'API Gateway', port: 3000],
+                        [name: 'Auth Service', port: 3001],
+                        [name: 'User Service', port: 3002],
+                        [name: 'Product Service', port: 3003]
+                    ]
+                    
+                    services.each { service ->
+                        try {
+                            sh "curl -f http://localhost:${service.port}/health || exit 1"
+                            echo "✓ ${service.name} is healthy"
+                        } catch (Exception e) {
+                            echo "✗ ${service.name} health check failed"
+                            error("Health check failed for ${service.name}")
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo 'Cleaning up workspace...'
+            sh 'docker system prune -f || true'
+        }
+        success {
+            echo '✓ Pipeline completed successfully!'
+            echo 'Services are running at:'
+            echo '  - API Gateway: http://localhost:3000'
+            echo '  - Auth Service: http://localhost:3001'
+            echo '  - User Service: http://localhost:3002'
+            echo '  - Product Service: http://localhost:3003'
+        }
+        failure {
+            echo '✗ Pipeline failed. Check logs for details.'
+        }
+    }
+}
